@@ -1664,15 +1664,17 @@ function openExchangeModal(item){
     </div>`;
   }
   function inRowHtml(i2,idx){
+    const linked = i2.linkedItemId ? state.items.find(it=>it.id===i2.linkedItemId) : null;
     return `<div data-inrow="${idx}" style="border:1px solid var(--border); border-radius:10px; padding:8px; margin-bottom:6px;">
       <div class="row2" style="margin-bottom:6px;">
         <select class="exInLinked"><option value="">新規（求リストと紐付けない）</option>${state.items.filter(it=>it.isWanted).map(w=>`<option value="${w.id}" ${i2.linkedItemId===w.id?'selected':''}>${escapeHtml(w.oshiName)}${w.name?'『'+escapeHtml(w.name)+'』':''}（求めてる絵柄）</option>`).join('')}</select>
         <input type="number" class="exInQty" value="${i2.qty||1}" min="1">
       </div>
-      <div class="row2" style="margin-bottom:6px;">
-        <input type="text" class="exInOshi" list="charListEx" placeholder="キャラ名" value="${escapeHtml(i2.oshiName||'')}">
-        <input type="text" class="exInName" placeholder="絵柄名(任意)" value="${escapeHtml(i2.name||'')}">
+      <div class="row2" style="margin-bottom:6px; ${linked?'display:none;':''}">
+        <input type="text" class="exInOshi" list="charListEx" placeholder="キャラ名" value="${escapeHtml(linked?linked.oshiName:(i2.oshiName||''))}">
+        <input type="text" class="exInName" placeholder="絵柄名(任意)" value="${escapeHtml(linked?(linked.name||''):(i2.name||''))}">
       </div>
+      ${linked?`<div class="hint" style="margin-bottom:6px;">🔗 ${escapeHtml(linked.oshiName)}${linked.name?'『'+escapeHtml(linked.name)+'』':''} に紐付け済み（キャラ名・絵柄名は自動で使われます）</div>`:''}
       <div class="row2">
         <select class="exInRelease"><option value="">グッズ未設定</option>${state.releases.map(r=>`<option value="${r.id}" ${i2.releaseId===r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}</select>
         <input type="file" class="exInImage" accept="image/*">
@@ -1817,6 +1819,20 @@ function openExchangeModal(item){
   document.getElementById('exAddOutRow').addEventListener('click', ()=>setTimeout(refreshShipRecommendation, 0));
   document.getElementById('exShip').addEventListener('change', validateShipSelection);
   refreshShipRecommendation();
+  document.getElementById('exInRows').addEventListener('change', (e)=>{
+    if(!e.target.classList.contains('exInLinked')) return;
+    const rowEl = e.target.closest('[data-inrow]');
+    const idx = Number(rowEl.dataset.inrow);
+    const linkedId = e.target.value;
+    const current = {
+      oshiName: rowEl.querySelector('.exInOshi')?.value||'',
+      name: rowEl.querySelector('.exInName')?.value||'',
+      qty: Number(rowEl.querySelector('.exInQty').value)||1,
+      linkedItemId: linkedId,
+      releaseId: rowEl.querySelector('.exInRelease').value||'',
+    };
+    rowEl.outerHTML = inRowHtml(current, idx);
+  });
 
   function buildDmText(){
     const t = state.dmTemplates.find(x=>x.id===document.getElementById('exDmSelect').value);
