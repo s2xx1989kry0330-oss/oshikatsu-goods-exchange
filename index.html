@@ -1513,18 +1513,18 @@ function generateFirstDmText(outEntries, scheduledDate){
   const dealSection = (releaseNames.length? releaseNames.join('、')+'\n' : '') + outEntries.map(e=>`・${e.item.oshiName}${e.item.name?'『'+e.item.name+'』':''}×${e.qty}`).join('\n');
   const visibleShip = [...state.shippingMethods].sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)).filter(s=>s.visible && (s.platformGroup||'個人')==='個人');
   const shipSection = visibleShip.length ? visibleShip.map(s=>`・${s.name}`).join('\n') : '・（マスタで発送方法を表示ONにしてください）';
-  // 梱包方法ごとにグルーピングして、同じ手順の重複表示を避ける
-  const packGroups = new Map(); // pmId -> {pm, labels:[]}
+  // 梱包方法の手順テキストだけを重複排除して列挙（キャラ名・個数は出さない）
+  const packTexts = [];
+  const seenPmKeys = new Set();
   outEntries.forEach(e=>{
     const release = state.releases.find(r=>r.id===e.item.releaseId);
     const pm = release && release.packingCategory ? state.packingMethods.find(p=>p.category===release.packingCategory && p.visible!==false) : null;
-    const key = pm ? pm.id : `none_${e.item.oshiName}${e.item.name||''}`;
-    if(!packGroups.has(key)) packGroups.set(key, {pm, labels:[]});
-    packGroups.get(key).labels.push(`${e.item.oshiName}${e.item.name?'『'+e.item.name+'』':''}×${e.qty}`);
+    const text = pm && pm.procedureText ? pm.procedureText : '（梱包手順未設定）';
+    if(seenPmKeys.has(text)) return;
+    seenPmKeys.add(text);
+    packTexts.push(text);
   });
-  const packSection = [...packGroups.values()].map(g=>{
-    return `${g.labels.join('、')}\n${g.pm&&g.pm.procedureText ? g.pm.procedureText : '（梱包手順未設定）'}`;
-  }).join('\n\n');
+  const packSection = packTexts.join('\n');
   return `この度はお声がけいただき、誠にありがとうございます。
 短い間ではございますが、お取引終了までどうぞよろしくお願いいたします。
 
