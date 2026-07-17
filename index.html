@@ -581,7 +581,11 @@ async function maybeSeedShippingMethods(){
 }
 async function maybeSeedPackingMethods(){
   if(seededFlags.pack) return;
-  if(state.packingMethods.length>0){ seededFlags.pack=true; return; }
+  if(state.packingMethods.length>0){
+    seededFlags.pack=true;
+    await migratePackingMethodOrder();
+    return;
+  }
   seededFlags.pack = true;
   // name, category, baseThicknessMm, baseWeightG, unitThicknessMm(1個/1枚あたり増分), unitWeightG(同左), note, procedureText, visible, bubbleLayers, boardSheets
   const defaults = [
@@ -601,8 +605,22 @@ async function maybeSeedPackingMethods(){
     ['うちわ','うちわ',0,0,8,40,'','両面段ボール補強→水濡れ防止OPP袋', false, 0, 2],
     ['アパレル','アパレル',0,0,15,150,'','畳んでOPP袋または宅配ビニール袋', false, 0, 0],
   ];
-  for(const d of defaults){
-    await addDocTo('packingMethods', {name:d[0], category:d[1], baseThicknessMm:d[2], baseWeightG:d[3], unitThicknessMm:d[4], unitWeightG:d[5], note:d[6], procedureText:d[7], visible:d[8], bubbleLayers:d[9], boardSheets:d[10]});
+  for(let i=0;i<defaults.length;i++){
+    const d = defaults[i];
+    await addDocTo('packingMethods', {name:d[0], category:d[1], baseThicknessMm:d[2], baseWeightG:d[3], unitThicknessMm:d[4], unitWeightG:d[5], note:d[6], procedureText:d[7], visible:d[8], bubbleLayers:d[9], boardSheets:d[10], sortOrder:i});
+  }
+}
+const PACK_ORDER_KEYS = ['缶バッジ(57mm)','缶バッジ(75mm)','アクキー・アクスタ(〜12cm)','大型アクスタ(15cm〜)','ラバーストラップ','ぬいぐるみ','トレカ','ポストカード','コースター','厚紙コースター','ミニ色紙','色紙','クリアファイル','うちわ','アパレル'];
+let packOrderMigrated = false;
+async function migratePackingMethodOrder(){
+  if(packOrderMigrated) return;
+  packOrderMigrated = true;
+  const missing = state.packingMethods.filter(p=>p.sortOrder==null);
+  if(!missing.length) return;
+  for(const p of missing){
+    let idx = PACK_ORDER_KEYS.indexOf(p.name);
+    if(idx<0) idx = 999;
+    await updateDocIn('packingMethods', p.id, {sortOrder: idx});
   }
 }
 async function maybeSeedPlatforms(){
@@ -807,7 +825,8 @@ function renderShipSection(){
     <div class="hint">個人向け／メルカリ／ヤフーフリマ／ラクマでタップして開閉できます。スイッチONのものだけがグッズ管理・売買管理・DM生成で使われます</div></div>`;
 }
 function renderPackSection(){
-  const list = state.packingMethods.length ? state.packingMethods.map(p=>{
+  const sortedPack = [...state.packingMethods].sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
+  const list = sortedPack.length ? sortedPack.map(p=>{
     const hasBase = (p.baseThicknessMm||0)>0 || (p.baseWeightG||0)>0;
     const sizeTxt = hasBase
       ? `固定分約${p.baseThicknessMm||0}mm/${p.baseWeightG||0}g＋1枚あたり約${p.unitThicknessMm}mm/${p.unitWeightG||0}g`
@@ -973,7 +992,7 @@ function openPackModal(item){
   document.getElementById('mSave').onclick=async()=>{
     const name=document.getElementById('pkName').value.trim(); if(!name) return;
     const data={name, category:document.getElementById('pkCategory').value, baseThicknessMm:Number(document.getElementById('pkFixedThick').value)||0, baseWeightG:Number(document.getElementById('pkFixedWeight').value)||0, unitThicknessMm:Number(document.getElementById('pkThick').value)||0, unitWeightG:Number(document.getElementById('pkWeight').value)||0, note:document.getElementById('pkNote').value, procedureText:document.getElementById('pkProcedure').value, visible:document.getElementById('pkVisible').checked};
-    if(isEdit) await updateDocIn('packingMethods', item.id, data); else await addDocTo('packingMethods', data);
+    if(isEdit) await updateDocIn('packingMethods', item.id, data); else await addDocTo('packingMethods', {...data, sortOrder: Math.max(999, ...state.packingMethods.map(p=>p.sortOrder??0))+1});
     showToast('保存しました'); closeModal();
   };
 }
@@ -1667,13 +1686,14 @@ function openExchangeModal(item){
     const linked = i2.linkedItemId ? state.items.find(it=>it.id===i2.linkedItemId) : null;
     return `<div data-inrow="${idx}" style="border:1px solid var(--border); border-radius:10px; padding:8px; margin-bottom:6px;">
       <div class="row2" style="margin-bottom:6px;">
-        <select class="exInLinked"><option value="">新規（求リストと紐付けない）</option>${state.items.filter(it=>it.isWanted).map(w=>`<option value="${w.id}" ${i2.linkedItemId===w.id?'selected':''}>${escapeHtml(w.oshiName)}${w.name?'『'+escapeHtml(w.name)+'』':''}（求めてる絵柄）</option>`).join('')}</select>
+        <select class="exInLinked"><option value="">✏️ 手入力する（異種交換・求リストと紐付けない）</option>${state.items.filter(it=>it.isWanted).map(w=>`<option value="${w.id}" ${i2.linkedItemId===w.id?'selected':''}>🔗 ${escapeHtml(w.oshiName)}${w.name?'『'+escapeHtml(w.name)+'』':''}（求めてる絵柄）</option>`).join('')}</select>
         <input type="number" class="exInQty" value="${i2.qty||1}" min="1">
       </div>
       <div class="row2" style="margin-bottom:6px; ${linked?'display:none;':''}">
-        <input type="text" class="exInOshi" list="charListEx" placeholder="キャラ名" value="${escapeHtml(linked?linked.oshiName:(i2.oshiName||''))}">
+        <input type="text" class="exInOshi" list="charListEx" placeholder="キャラ名（手入力）" value="${escapeHtml(linked?linked.oshiName:(i2.oshiName||''))}">
         <input type="text" class="exInName" placeholder="絵柄名(任意)" value="${escapeHtml(linked?(linked.name||''):(i2.name||''))}">
       </div>
+      ${!linked?`<div class="hint" style="margin-bottom:6px;">異種交換など求リストにないグッズは、ここに直接キャラ名を入力すればOK。完了時にグッズ管理へそのまま新規登録されます</div>`:''}
       ${linked?`<div class="hint" style="margin-bottom:6px;">🔗 ${escapeHtml(linked.oshiName)}${linked.name?'『'+escapeHtml(linked.name)+'』':''} に紐付け済み（キャラ名・絵柄名は自動で使われます）</div>`:''}
       <div class="row2">
         <select class="exInRelease"><option value="">グッズ未設定</option>${state.releases.map(r=>`<option value="${r.id}" ${i2.releaseId===r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}</select>
