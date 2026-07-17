@@ -1,0 +1,1962 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>グッズ交換在庫管理</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#FF6FA5">
+<style>
+:root{
+  --bg:#FFF7FB; --surface:#FFFFFF; --surface2:#FFF0F6; --text:#3A2E35; --sub:#8A7A83;
+  --accent:#FF6FA5; --accent2:#6FCBFF; --accent3:#FFD166; --border:#FFE1EE;
+  --danger:#FF4B5C; --good:#3DBE8B; --radius:16px; --shadow:0 4px 16px rgba(255,111,165,.14);
+}
+html[data-theme="navy"]{
+  --bg:#0B0F1A; --surface:#141B2C; --surface2:#1B2438; --text:#EDEEF3; --sub:#9AA3B8;
+  --accent:#E8B44C; --accent2:#24304C; --accent3:#0F1626; --border:#2A3550;
+  --danger:#FF6B6B; --good:#4CD3A0; --shadow:0 4px 16px rgba(0,0,0,.4);
+}
+html[data-theme="mint"]{
+  --bg:#F5F3FF; --surface:#FFFFFF; --surface2:#EFEBFF; --text:#332F45; --sub:#8783A0;
+  --accent:#A78BFA; --accent2:#5FD9B4; --accent3:#FFD166; --border:#E3DCFF;
+  --danger:#FF6F91; --good:#2FBF8F; --shadow:0 4px 16px rgba(167,139,250,.16);
+}
+html[data-theme="mono"]{
+  --bg:#0E0E0E; --surface:#1A1A1A; --surface2:#232323; --text:#F2F2F2; --sub:#9A9A9A;
+  --accent:#FF4B5C; --accent2:#2A2A2A; --accent3:#121212; --border:#2E2E2E;
+  --danger:#FF4B5C; --good:#43C98A; --shadow:0 4px 16px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  padding-bottom:84px; min-height:100vh;
+}
+header{
+  position:sticky; top:0; z-index:20; background:var(--surface);
+  border-bottom:1px solid var(--border); padding:14px 16px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+header h1{font-size:17px; margin:0; font-weight:800; letter-spacing:.02em;}
+header .sub{font-size:11px; color:var(--sub); margin-top:2px;}
+.iconbtn{
+  background:var(--surface2); border:1px solid var(--border); border-radius:12px;
+  width:38px; height:38px; display:flex; align-items:center; justify-content:center;
+  font-size:16px; cursor:pointer; color:var(--text);
+}
+main{padding:16px; max-width:640px; margin:0 auto;}
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:16px; margin-bottom:14px; box-shadow:var(--shadow);
+}
+.card h2{font-size:14px; margin:0 0 12px; font-weight:800; display:flex; align-items:center; gap:6px;}
+.card h2 .badge{background:var(--accent); color:#fff; font-size:10px; padding:2px 8px; border-radius:20px; font-weight:700;}
+.card h2 .badge.good{background:var(--good);}
+.section-tabs{display:flex; gap:6px; overflow-x:auto; padding:4px 16px 12px; -ms-overflow-style:none; scrollbar-width:none;}
+.section-tabs::-webkit-scrollbar{display:none;}
+.section-tabs button{
+  flex:0 0 auto; border:1px solid var(--border); background:var(--surface); color:var(--sub);
+  padding:8px 14px; border-radius:20px; font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap;
+}
+.section-tabs button.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+.row{display:flex; gap:8px; align-items:center;}
+.row + .row{margin-top:8px;}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+input[type=text], input[type=number], input[type=date], select, textarea{
+  width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:10px;
+  background:var(--bg); color:var(--text); font-size:14px; font-family:inherit;
+}
+textarea{resize:vertical; min-height:70px; line-height:1.5;}
+label.field{display:block; font-size:11.5px; color:var(--sub); margin-bottom:4px; font-weight:700;}
+.field-group{margin-bottom:10px;}
+.btn{border:none; border-radius:10px; padding:10px 16px; font-size:13.5px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px;}
+.btn-primary{background:var(--accent); color:#fff;}
+.btn-ghost{background:var(--surface2); color:var(--text); border:1px solid var(--border);}
+.btn-danger{background:transparent; color:var(--danger); border:1px solid var(--danger);}
+.btn-sm{padding:7px 12px; font-size:12px;}
+.btn-block{width:100%;}
+.list-item{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; background:var(--surface2); border-radius:10px; margin-bottom:8px;}
+.list-item .meta{font-size:13px; font-weight:700;}
+.list-item .sub-meta{font-size:11px; color:var(--sub); margin-top:2px;}
+.list-item .actions{display:flex; gap:6px; flex-shrink:0;}
+.iconsm{background:none; border:none; font-size:15px; cursor:pointer; color:var(--sub); padding:4px;}
+.genre-block{border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; background:var(--bg);}
+.genre-block .genre-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+.genre-block .genre-name{font-weight:800; font-size:14px;}
+.oshi-chip{display:inline-flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border); padding:5px 10px; border-radius:16px; font-size:12px; margin:0 6px 6px 0;}
+.oshi-chip button{background:none; border:none; color:var(--sub); font-size:12px; cursor:pointer; padding:0;}
+.empty{text-align:center; padding:28px 16px; color:var(--sub); font-size:13px;}
+.tabbar{position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border); display:flex; overflow-x:auto; z-index:20; padding-bottom:env(safe-area-inset-bottom);}
+.tabbar button{flex:0 0 auto; min-width:66px; background:none; border:none; padding:10px 6px 8px; display:flex; flex-direction:column; align-items:center; gap:2px; color:var(--sub); font-size:9.5px; font-weight:700; cursor:pointer;}
+.tabbar button .ic{font-size:18px;}
+.tabbar button.active{color:var(--accent);}
+.modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:50; display:flex; align-items:flex-end; justify-content:center;}
+.modal-overlay.center{align-items:center; padding:16px;}
+.modal{background:var(--surface); width:100%; max-width:600px; border-radius:20px 20px 0 0; padding:20px 18px calc(20px + env(safe-area-inset-bottom)); max-height:86vh; overflow-y:auto;}
+.modal-overlay.center .modal{border-radius:18px; max-height:80vh;}
+.modal h3{margin:0 0 14px; font-size:15px; font-weight:800;}
+.modal-actions{display:flex; gap:8px; margin-top:16px;}
+.modal-actions .btn{flex:1;}
+.theme-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.theme-opt{border:2px solid var(--border); border-radius:14px; padding:10px; cursor:pointer; text-align:center;}
+.theme-opt.active{border-color:var(--accent);}
+.theme-opt .swatch{height:38px; border-radius:10px; margin-bottom:6px;}
+.theme-opt .label{font-size:11px; font-weight:700;}
+.toast{position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0; background:var(--text); color:var(--bg); padding:10px 18px; border-radius:24px; font-size:12.5px; font-weight:700; z-index:60; transition:.25s; pointer-events:none;}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+.login-wrap{min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center;}
+.login-wrap h1{font-size:22px; margin-bottom:6px;}
+.login-wrap p{color:var(--sub); font-size:13px; margin-bottom:24px;}
+.gsi-btn{background:var(--accent); color:#fff; border:none; border-radius:12px; padding:13px 28px; font-size:14px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:8px;}
+.hint{font-size:11.5px; color:var(--sub); line-height:1.6; margin-top:6px;}
+.comingsoon{text-align:center; padding:60px 20px; color:var(--sub);}
+.comingsoon .ic{font-size:40px; margin-bottom:12px;}
+.toggle{position:relative; width:40px; height:22px; flex-shrink:0;}
+.toggle input{opacity:0; width:0; height:0;}
+.toggle .slider{position:absolute; inset:0; background:var(--border); border-radius:22px; cursor:pointer; transition:.2s;}
+.toggle .slider:before{content:''; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s;}
+.toggle input:checked + .slider{background:var(--accent);}
+.toggle input:checked + .slider:before{transform:translateX(18px);}
+.status-pill{display:inline-block; font-size:10.5px; font-weight:800; padding:3px 9px; border-radius:20px;}
+.status-pill.blue{background:#E6F4FF; color:#1E7FD1;}
+.status-pill.orange{background:#FFF1DC; color:#C9791A;}
+.status-pill.green{background:#E4F9F0; color:#1E9E6E;}
+.status-pill.gray{background:var(--surface2); color:var(--sub);}
+html[data-theme="navy"] .status-pill,html[data-theme="mono"] .status-pill{background:var(--surface2); color:var(--text);}
+.reminder-badge{display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:800; color:var(--danger); margin-top:4px;}
+.stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;}
+.stat-box{background:var(--surface2); border-radius:12px; padding:12px;}
+.stat-box .label{font-size:11px; color:var(--sub); font-weight:700;}
+.stat-box .value{font-size:19px; font-weight:800; margin-top:4px;}
+.cmp-table{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px;}
+.receipt{background:var(--surface2); border:1px dashed var(--accent); border-radius:12px; padding:14px; margin-top:10px;}
+.r-row{display:flex; justify-content:space-between; font-size:13px; padding:5px 0;}
+.r-line{border-top:1px dashed var(--border); margin:6px 0;}
+.r-total{display:flex; justify-content:space-between; font-size:15px; font-weight:900; color:var(--accent); padding-top:4px;}
+.r-note{font-size:10.5px; color:var(--sub); margin-top:8px;}
+.plat-select{display:flex; gap:6px; overflow-x:auto; margin-bottom:8px;}
+.plat-select button{flex:0 0 auto; border:1px solid var(--border); background:var(--surface); padding:7px 14px; border-radius:16px; font-size:12px; font-weight:700; color:var(--sub);}
+.plat-select button.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+.cmp-table th,.cmp-table td{padding:8px; text-align:left; border-bottom:1px solid var(--border);}
+.cmp-table th{color:var(--sub); font-weight:700; font-size:11px;}
+.item-card{border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; background:var(--surface2);}
+.item-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:10px;}
+.item-grid-card{border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--surface2); cursor:pointer; position:relative;}
+.item-grid-card .thumb{position:relative; width:100%; aspect-ratio:1/1; background:var(--surface); background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; font-size:30px; color:var(--sub);}
+.item-grid-card .qty-badge{position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,.65); color:#fff; font-size:11px; font-weight:800; padding:2px 9px; border-radius:12px;}
+.item-grid-card .pin-badge{position:absolute; top:6px; left:6px; font-size:14px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));}
+.item-grid-card .del-badge{position:absolute; top:4px; right:4px; background:rgba(0,0,0,.5); color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:11px; cursor:pointer;}
+.item-grid-card .info{padding:8px;}
+.item-grid-card .gname{font-size:12px; font-weight:800; line-height:1.3; margin-bottom:3px;}
+.item-grid-card .gtag{font-size:10px; color:var(--sub);}
+.item-grid-card .damage-badge{font-size:10px; color:var(--danger); font-weight:800; margin-top:3px;}
+.item-card .top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+.item-card .name{font-weight:800; font-size:14px;}
+.item-card .tags{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px;}
+.tag{font-size:10.5px; background:var(--surface); border:1px solid var(--border); padding:2px 8px; border-radius:10px; color:var(--sub);}
+.item-card .qty-row{display:flex; gap:14px; margin-top:8px; font-size:11.5px; color:var(--sub);}
+.item-card .status-row{display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; align-items:center;}
+.copybox{background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:10px; font-size:12.5px; line-height:1.7; white-space:pre-wrap; margin-top:8px;}
+.chip-select{display:flex; flex-wrap:wrap; gap:6px;}
+.chip-select label{display:flex; align-items:center; gap:5px; border:1px solid var(--border); border-radius:16px; padding:6px 10px; font-size:12px; cursor:pointer; background:var(--surface);}
+.chip-select input{margin:0;}
+.filter-select{display:flex; gap:6px; overflow-x:auto; margin-bottom:10px;}
+summary::-webkit-details-marker{display:none;}
+summary::marker{display:none; content:'';}
+details summary:after{content:'▸'; float:right; color:var(--sub);}
+details[open] summary:after{content:'▾';}
+.filter-select button{flex:0 0 auto; border:1px solid var(--border); background:var(--surface); color:var(--sub); padding:6px 12px; border-radius:16px; font-size:11.5px; font-weight:700;}
+.filter-select button.active{background:var(--text); color:var(--bg); border-color:var(--text);}
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="login-wrap" style="display:none;">
+  <div style="font-size:40px; margin-bottom:10px;">🔁</div>
+  <h1>グッズ交換在庫管理</h1>
+  <p>ダブりグッズの交換・売買を記録するアプリです<br>Googleアカウントでログインしてください</p>
+  <button class="gsi-btn" id="googleSignInBtn">Googleでログイン</button>
+</div>
+
+<div id="appRoot" style="display:none;">
+  <header>
+    <div>
+      <h1>グッズ交換在庫管理</h1>
+      <div class="sub" id="userLabel"></div>
+    </div>
+    <div class="row" style="gap:8px;">
+      <button class="iconbtn" id="themeBtn">🎨</button>
+      <button class="iconbtn" id="logoutBtn">⎋</button>
+    </div>
+  </header>
+  <main id="mainArea"></main>
+  <div class="tabbar" id="tabbar">
+    <button data-tab="dashboard" class="active"><span class="ic">🏠</span>ホーム</button>
+    <button data-tab="master"><span class="ic">🗂️</span>マスタ</button>
+    <button data-tab="items"><span class="ic">📦</span>グッズ管理</button>
+    <button data-tab="sale"><span class="ic">💰</span>売買管理</button>
+    <button data-tab="exchange"><span class="ic">🤝</span>交換記録</button>
+    <button data-tab="history"><span class="ic">📜</span>履歴</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<div id="modalHost"></div>
+
+<script type="module">
+/* ================= Firebase 設定 ================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyC6wAmj0-5j0vE1n-zwBwPwzMaAry4QmAI",
+  authDomain: "oshikatsu-goods.firebaseapp.com",
+  projectId: "oshikatsu-goods",
+  storageBucket: "oshikatsu-goods.firebasestorage.app",
+  messagingSenderId: "979698953003",
+  appId: "1:979698953003:web:5e363c5331d99c9eab736e"
+};
+/* グッズ帳のレシートスキャンと同じGemini APIキーを使用 */
+const GEMINI_API_KEY = "AQ.Ab8RN6JR-pU7VS_1CJp0OKZUu_LlDaPZCt6yXHMSup5_MT2zqQ";
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = getFirestore(fbApp);
+
+let uid = null;
+const unsub = {};
+
+const THEMES = [
+  { key:'pop',  label:'スイートポップ', preview:'linear-gradient(135deg, #FF6FA5, #6FCBFF, #FFD166)' },
+  { key:'navy', label:'インク×ゴールド', preview:'linear-gradient(135deg, #0F1626, #24304C, #E8B44C)' },
+  { key:'mint', label:'ミント×ラベンダー', preview:'linear-gradient(135deg, #A78BFA, #5FD9B4, #FFD166)' },
+  { key:'mono', label:'モノトーン×レッド', preview:'linear-gradient(135deg, #121212, #2A2A2A, #FF4B5C)' },
+];
+
+const NEGOTIATION_REMINDER_DAYS = 7;
+const LISTING_REMINDER_DAYS = 14;
+const FOLLOW_REMINDER_DAYS = 3;
+
+let state = {
+  theme:'pop',
+  genres:[], shippingMethods:[], packingMethods:[], dmTemplates:[],
+  platforms:[], items:[], releases:[], exchangeRecords:[], dmHistory:[],
+  goodsCharacters:[], goodsItems:[],
+};
+let ui = { tab:'dashboard', masterSub:'genre', itemsFilterRelease:'ALL', saleFilterStatus:'ALL', shipOpenGroups:{'個人':true} };
+
+function uidGen(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function daysSince(dateStr){ if(!dateStr) return 0; return Math.floor((Date.now()-new Date(dateStr).getTime())/86400000); }
+function partnerLabel(r){
+  if(r.partnerUserName && r.partnerAccountName) return `${r.partnerUserName}（${r.partnerAccountName}）`;
+  return r.partnerUserName || r.partnerAccountName || '（相手未設定）';
+}
+function allPartnerNameOptions(){
+  const names = state.exchangeRecords.map(r=>r.partnerUserName).filter(Boolean);
+  const accounts = state.exchangeRecords.map(r=>r.partnerAccountName).filter(Boolean);
+  return { names:[...new Set(names)], accounts:[...new Set(accounts)] };
+}
+function yen(n){ return '¥'+Number(n||0).toLocaleString('ja-JP'); }
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
+function applyTheme(){ document.documentElement.setAttribute('data-theme', state.theme||'pop'); }
+function closeModal(){ document.getElementById('modalHost').innerHTML=''; }
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function allOshiList(){
+  const out=[];
+  state.genres.forEach(g=>(g.oshiList||[]).forEach(o=>out.push({genreId:g.id, genreName:g.name, oshiId:o.id, oshiName:o.name})));
+  return out;
+}
+// 発送済み以降（ほぼ確定）の交換記録に紐づく「渡す予定」数量を集計
+function calcPendingOutQty(itemId){
+  const CONFIRMED = ['発送済み','受取確認待ち'];
+  let total=0;
+  state.exchangeRecords.forEach(r=>{
+    if(!CONFIRMED.includes(r.status)) return;
+    (r.outItemsLinked||[]).forEach(o=>{ if(o.itemId===itemId) total+=Number(o.qty)||0; });
+  });
+  return total;
+}
+function calcPendingSecuredQty(itemId){
+  const CONFIRMED = ['発送済み','受取確認待ち'];
+  let total=0;
+  state.exchangeRecords.forEach(r=>{
+    if(!CONFIRMED.includes(r.status)) return;
+    (r.inItemsLinked||[]).forEach(i=>{ if(i.linkedItemId===itemId) total+=Number(i.qty)||0; });
+  });
+  return total;
+}
+
+/* ---------------- Gemini APIによる商品ページスクショ解析 ---------------- */
+function resizeImageFile(file, maxDim=800, quality=0.8){
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = ()=>{
+      let w=img.width, h=img.height;
+      if(w>h){ if(w>maxDim){ h=Math.round(h*maxDim/w); w=maxDim; } }
+      else { if(h>maxDim){ w=Math.round(w*maxDim/h); h=maxDim; } }
+      const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      canvas.toBlob(blob=>{ URL.revokeObjectURL(url); resolve(blob||file); }, 'image/jpeg', quality);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+function blobToDataURL(blob){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+const MAX_IMAGE_DATAURL_BYTES = 650000; // Firestoreの1ドキュメント1MB制限に対する安全マージン（グッズ帳と同方式）
+async function uploadItemImage(file, itemId){
+  // Firebase Storageは使わず、グッズ帳と同じくFirestoreにbase64で保存する
+  let quality = 0.8, maxDim = 800;
+  for(let i=0;i<4;i++){
+    const resized = await resizeImageFile(file, maxDim, quality);
+    const dataUrl = await blobToDataURL(resized);
+    if(dataUrl.length <= MAX_IMAGE_DATAURL_BYTES || (quality<=0.4 && maxDim<=400)) return dataUrl;
+    quality = Math.max(0.4, quality-0.15);
+    maxDim = Math.max(400, Math.round(maxDim*0.8));
+  }
+  return await blobToDataURL(await resizeImageFile(file, 400, 0.4));
+}
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+// 503(モデル過負荷)・429(レート制限)エラー時に指数バックオフで自動リトライする（グッズ帳と同方式）
+async function fetchGeminiWithRetry(url, options, maxRetries = 3){
+  let lastRes;
+  for(let attempt = 0; attempt <= maxRetries; attempt++){
+    lastRes = await fetch(url, options);
+    if(lastRes.status !== 503 && lastRes.status !== 429) return lastRes;
+    if(attempt === maxRetries) return lastRes;
+    const waitMs = 1000 * Math.pow(2, attempt);
+    await new Promise(r => setTimeout(r, waitMs));
+  }
+  return lastRes;
+}
+async function analyzeScreenshotWithGemini(file){
+  const base64 = await fileToBase64(file);
+  const prompt = `この画像は推し活グッズの商品ページのスクリーンショットです。画像内から商品情報を抽出してください。
+1つの商品ページに複数キャラクター分の商品が並んでいる場合（例：全キャラ分の缶バッジ一覧など）は、キャラクターごとに配列の要素を分けてください。
+以下のJSON形式のみで返答してください（説明文は不要）:
+{"items":[{"name":"商品名（絵柄・シリーズ名を含めてよい）","characterName":"キャラクター名（不明なら空文字）","price":数値（不明なら0）,"brand":"発売元・ブランド名（不明なら空文字）"}]}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
+  const res = await fetchGeminiWithRetry(url, {
+    method:'POST', headers:{'Content-Type':'application/json', 'X-goog-api-key': GEMINI_API_KEY},
+    body: JSON.stringify({ contents:[{ parts:[ {text:prompt}, {inline_data:{mime_type:file.type, data:base64}} ] }] })
+  });
+  if(!res.ok){
+    const reasons = { 429: 'レート制限に達した', 503: 'サーバー混雑中', 404: 'モデルが見つからない', 400: 'リクエスト不正' };
+    const reason = reasons[res.status] || '不明なエラー';
+    throw new Error(`Gemini APIエラー ${res.status}（${reason}）`);
+  }
+  const json = await res.json();
+  const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+  const cleaned = text.replace(/```json|```/g,'').trim();
+  let parsed;
+  try{ parsed = JSON.parse(cleaned); }catch(e){ throw new Error('解析結果の読み取りに失敗しました'); }
+  return parsed.items || [];
+}
+function guessOshiNameFromCharacter(characterName){
+  if(!characterName) return '';
+  const oshis = allOshiList();
+  const hit = oshis.find(o=>o.oshiName && characterName.includes(o.oshiName));
+  return hit ? hit.oshiName : '';
+}
+function openScreenshotAnalyzeModal(targetType){
+  const host=document.getElementById('modalHost');
+  host.innerHTML=`<div class="modal-overlay center" id="ov"><div class="modal">
+    <h3>📸 商品ページのスクショから読み取る</h3>
+    <div class="field-group"><input type="file" id="ssFile" accept="image/*"></div>
+    <button class="btn btn-primary btn-block" id="ssAnalyzeBtn">解析する</button>
+    <div id="ssStatus" class="hint" style="margin-top:8px;"></div>
+    <div id="ssRows" style="margin-top:10px;"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">閉じる</button><button class="btn btn-primary" id="ssSaveBtn" style="display:none;">選択した内容を登録</button></div>
+  </div></div>`;
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+  const charOptions = allCharacterNameOptions();
+
+  function rowHtml(it, i){
+    const guessedOshi = guessOshiNameFromCharacter(it.characterName) || it.characterName || '';
+    return `<div class="genre-block" data-row="${i}">
+      <div class="row" style="margin-bottom:6px;"><input type="checkbox" class="ssCheck" checked style="width:auto;"><input type="text" class="ssName" value="${escapeHtml(it.name||'')}" placeholder="商品名"></div>
+      <div class="row2">
+        <input type="text" class="ssOshi" list="charListSs" value="${escapeHtml(guessedOshi)}" placeholder="キャラ名">
+        <input type="number" class="ssPrice" value="${it.price||0}" placeholder="価格">
+      </div>
+      <input type="text" class="ssBrand" value="${escapeHtml(it.brand||'')}" placeholder="発売元/ブランド（任意）" style="margin-top:6px;">
+    </div>`;
+  }
+
+  document.getElementById('ssAnalyzeBtn').onclick = async ()=>{
+    const fileInput = document.getElementById('ssFile');
+    if(!fileInput.files[0]){ showToast('画像を選択してください'); return; }
+    const statusEl = document.getElementById('ssStatus');
+    statusEl.textContent = '解析中…';
+    try{
+      const items = await analyzeScreenshotWithGemini(fileInput.files[0]);
+      if(!items.length){ statusEl.textContent='商品情報を読み取れませんでした。手動で入力してください。'; return; }
+      statusEl.textContent = `${items.length}件検出しました。内容を確認して登録してください。`;
+      document.getElementById('ssRows').innerHTML = `<datalist id="charListSs">${charOptions.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>` + items.map(rowHtml).join('');
+      document.getElementById('ssSaveBtn').style.display='block';
+    }catch(e){
+      statusEl.textContent = '解析に失敗しました：'+e.message;
+    }
+  };
+  document.getElementById('ssSaveBtn').onclick = async ()=>{
+    const rows = [...document.querySelectorAll('#ssRows [data-row]')];
+    const checkedRows = rows.filter(r=>r.querySelector('.ssCheck').checked && r.querySelector('.ssName').value.trim());
+    if(!checkedRows.length){ closeModal(); return; }
+    const firstName = checkedRows[0].querySelector('.ssName').value.trim();
+    const firstPrice = Number(checkedRows[0].querySelector('.ssPrice').value)||0;
+    const releaseRef = await addDocTo('releases', {name:firstName, definedPrice:firstPrice, packingCategory:''});
+    let count=0;
+    for(const row of checkedRows){
+      const name = row.querySelector('.ssName').value.trim();
+      const oshiName = row.querySelector('.ssOshi').value.trim();
+      const price = Number(row.querySelector('.ssPrice').value)||0;
+      if(!oshiName) continue;
+      await addDocTo('exchangeItems', {
+        releaseId: releaseRef.id, oshiName, name,
+        totalQty:1, hasDamage:false, damageNote:'',
+        isWanted:false, wantedTarget:null, priority:false,
+        saleStatus:null, saleStatusDate:todayStr(),
+        costPrice: price||null,
+      });
+      count++;
+    }
+    showToast(`${count}件登録しました`); closeModal();
+  };
+}
+
+
+document.getElementById('googleSignInBtn').onclick = async ()=>{
+  try{ await signInWithPopup(auth, new GoogleAuthProvider()); }catch(e){ alert('ログインに失敗しました: '+e.message); }
+};
+document.getElementById('logoutBtn').onclick = async ()=>{
+  Object.values(unsub).forEach(fn=>fn&&fn());
+  await signOut(auth);
+};
+onAuthStateChanged(auth, (user)=>{
+  if(user){
+    uid = user.uid;
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('appRoot').style.display='block';
+    document.getElementById('userLabel').textContent = user.displayName || user.email || '';
+    bindCollections();
+  }else{
+    uid = null;
+    document.getElementById('loginScreen').style.display='flex';
+    document.getElementById('appRoot').style.display='none';
+  }
+});
+
+/* ---------------- Firestore ---------------- */
+function col(name){ return collection(db,'users',uid,name); }
+function bindSimple(stateKey, collName, afterFirst){
+  unsub[collName] = onSnapshot(query(col(collName)), (snap)=>{
+    state[stateKey] = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    if(afterFirst) afterFirst();
+    render();
+  });
+}
+function bindCollections(){
+  bindSimple('genres','genres');
+  bindSimple('shippingMethods','shippingMethods', maybeSeedShippingMethods);
+  bindSimple('packingMethods','packingMethods', maybeSeedPackingMethods);
+  bindSimple('dmTemplates','dmTemplates');
+  bindSimple('platforms','platforms', maybeSeedPlatforms);
+  bindSimple('goodsCharacters','characters');
+  bindSimple('goodsItems','items');
+  bindSimple('items','exchangeItems');
+  bindSimple('releases','releases');
+  bindSimple('exchangeRecords','exchangeRecords');
+  bindSimple('dmHistory','dmHistory');
+
+  const settingsRef = doc(db,'users',uid,'settings','app');
+  unsub.settings = onSnapshot(settingsRef, (snap)=>{
+    if(snap.exists()){ state.theme = snap.data().theme || 'pop'; applyTheme(); }
+    render();
+  });
+}
+async function addDocTo(collName, data){ return await addDoc(col(collName), {...data, createdAt: serverTimestamp()}); }
+async function updateDocIn(collName, id, data){ await updateDoc(doc(db,'users',uid,collName,id), data); }
+async function deleteDocIn(collName, id){ await deleteDoc(doc(db,'users',uid,collName,id)); }
+async function saveTheme(themeKey){ state.theme=themeKey; applyTheme(); await setDoc(doc(db,'users',uid,'settings','app'), {theme:themeKey}, {merge:true}); }
+
+/* ---------------- 初期プリセット投入（1回のみ） ---------------- */
+let seededFlags = {ship:false, pack:false, platform:false};
+async function maybeSeedShippingMethods(){
+  if(seededFlags.ship) return;
+  if(state.shippingMethods.length>0){ seededFlags.ship=true; return; }
+  seededFlags.ship = true;
+  const defaults = [
+    // provider, name, sanpen(cm), nagahen(cm), thickness(cm), weight(kg), price, note, visible, serviceGroup, platformGroup
+    // ================= 個人向け（日本郵便・ヤマト運輸・佐川急便） =================
+    ['日本郵便','レターパックライト',null,34,3,4,430,'34×24.8cm・厚さ3cm・追跡あり・郵便受けに投函',true,null,'個人'],
+    ['日本郵便','レターパックプラス',null,34,999,4,600,'34×24.8cm・厚さ制限なし・追跡あり・対面手渡し受領',false,null,'個人'],
+    ['日本郵便','定形郵便',null,23.5,1,0.05,110,'23.5×12cm・厚さ1cm・50g内・追跡なし',true,'普通郵便','個人'],
+    ['日本郵便','定形外郵便(規格内)50g',null,34,3,0.05,140,'34×25cm・厚さ3cm・追跡なし',true,'普通郵便','個人'],
+    ['日本郵便','定形外郵便(規格内)100g',null,34,3,0.1,180,'34×25cm・厚さ3cm・追跡なし',false,'普通郵便','個人'],
+    ['日本郵便','定形外郵便(規格外)50g',90,60,null,0.05,260,'長辺60cm以内・3辺計90cm以内・追跡なし',false,'普通郵便','個人'],
+    ['日本郵便','定形外郵便(規格外)100g',90,60,null,0.1,290,'長辺60cm以内・3辺計90cm以内・追跡なし',false,'普通郵便','個人'],
+    ['日本郵便','スマートレター',null,25,2,1,210,'25×17cm・厚さ2cm・1kg内・追跡なし',false,null,'個人'],
+    ['日本郵便','クリックポスト',60,34,999,2,240,'長辺34cm以内・3辺合計60cm以内・追跡あり・郵便受けに投函',true,null,'個人'],
+    ['日本郵便','ゆうメール150g',null,25,3,0.15,190,'34×25cm・厚さ3cm・追跡なし・本/CD等の印刷物向け',false,null,'個人'],
+    ['日本郵便','ゆうメール250g',null,25,3,0.25,230,'34×25cm・厚さ3cm・追跡なし',false,null,'個人'],
+    ['日本郵便','ゆうメール500g',null,25,3,0.5,320,'34×25cm・厚さ3cm・追跡なし',false,null,'個人'],
+    ['日本郵便','ゆうメール1kg',null,25,3,1,380,'34×25cm・厚さ3cm・追跡なし',false,null,'個人'],
+    ['日本郵便','ゆうパック(60サイズ)',60,null,null,999,-1,'エリア別運賃・3辺合計60cm以内・追跡あり・補償あり(上限30万円)',false,null,'個人'],
+    ['ヤマト運輸','こねこ便420',null,34,3,null,420,'34×24.8cm・厚さ3cm・沖縄発着を除く・追跡あり・補償あり(上限3千円)',false,null,'個人'],
+    ['ヤマト運輸','宅急便コンパクト',null,25,5,999,-1,'エリア別運賃+専用箱¥70・専用箱25×20×厚さ5cm・追跡あり・補償あり(上限3万円)',false,null,'個人'],
+    ['ヤマト運輸','宅急便(60サイズ)',60,null,null,999,-1,'エリア別運賃・3辺合計60cm以内・追跡あり・補償あり(上限30万円)',false,null,'個人'],
+    // ================= メルカリ（らくらくメルカリ便・ゆうゆうメルカリ便） =================
+    ['メルカリ便(らくらく)','ネコポス',60,34,3,1,210,'23〜31.2cm×11.5〜22.8cm・ポスト受取サイズ',true,null,'メルカリ'],
+    ['メルカリ便(らくらく)','宅急便コンパクト',null,null,5,999,450,'薄型24.8×34cm/箱型20×25×5cm・専用BOX代別（自宅集荷+¥100）',false,null,'メルカリ'],
+    ['メルカリ便(らくらく)','宅急便60サイズ',null,null,null,2,750,'100サイズまでスマリ対応・自宅集荷+¥100',false,null,'メルカリ'],
+    ['メルカリ便(らくらく)','宅急便100サイズ',null,null,null,10,1050,'',false,null,'メルカリ'],
+    ['メルカリ便(らくらく)','宅急便140サイズ〜',null,null,null,25,1450,'140〜200サイズは¥1,450〜¥2,500',false,null,'メルカリ'],
+    ['メルカリ便(ゆうゆう)','ゆうパケットポストmini',null,21.1,3,2,160,'内寸21.1×16.8cm・専用封筒代+¥20・郵便ポストのみ',true,null,'メルカリ'],
+    ['メルカリ便(ゆうゆう)','ゆうパケットポスト',60,34,3,2,215,'3辺合計60cm以内・専用シール+¥5(20枚¥100)or専用箱+¥65',false,null,'メルカリ'],
+    ['メルカリ便(ゆうゆう)','ゆうパケット',34,23,3,1,230,'34×23×3cm以内・スマリ対応',true,null,'メルカリ'],
+    ['メルカリ便(ゆうゆう)','ゆうパケットプラス',null,24,7,2,455,'17×24×7cm・専用箱+¥65・スマリ対応',false,null,'メルカリ'],
+    ['メルカリ便(ゆうゆう)','ゆうパック60サイズ',null,null,null,2,750,'25kgまでスマリ100サイズ対応',false,null,'メルカリ'],
+    ['メルカリ便(ゆうゆう)','ゆうパック140サイズ〜',null,null,null,25,1450,'140〜170サイズは¥1,450〜¥1,900',false,null,'メルカリ'],
+    // ================= ヤフーフリマ（おてがる配送） =================
+    ['おてがる配送(ヤマト)','ネコポス',60,34,3,1,170,'角形A4サイズ・23〜31.2×11.5〜22.8cm・匿名配送/補償あり',false,null,'ヤフーフリマ'],
+    ['おてがる配送(ヤマト)','宅急便コンパクト(EAZY)',null,null,999,999,380,'専用薄型BOX24.8×34cm厚さ5mm程度or専用BOX20×25cm・専用BOX+¥70',false,null,'ヤフーフリマ'],
+    ['おてがる配送(ヤマト)','宅急便(EAZY)60サイズ',null,null,null,2,700,'匿名配送/補償あり',false,null,'ヤフーフリマ'],
+    ['おてがる配送(ヤマト)','宅急便(EAZY)140サイズ〜',null,null,null,25,1300,'140〜160サイズは¥1,300〜¥1,600',false,null,'ヤフーフリマ'],
+    ['おてがる配送(日本郵便)','ゆうパケット',60,34,3,1,175,'A4サイズ3辺合計60cm以内・長辺34cm以内・匿名配送不可',false,null,'ヤフーフリマ'],
+    ['おてがる配送(日本郵便)','ゆうパケットポスト',null,22.8,3,2,175,'専用箱22.8×32.7×3cm・専用箱¥65 or 発送用シール¥100(20枚)・匿名配送不可',false,null,'ヤフーフリマ'],
+    ['おてがる配送(日本郵便)','ゆうパック60サイズ',null,null,null,25,700,'対面/置き配',false,null,'ヤフーフリマ'],
+    ['おてがる配送(日本郵便)','ゆうパック140サイズ〜',null,null,null,25,1500,'140〜170サイズは¥1,500〜¥1,800',false,null,'ヤフーフリマ'],
+    // ================= ラクマ（かんたんラクマパック） =================
+    ['かんたんラクマパック(日本郵便)','ゆうパケットポストmini',null,21.6,3,2,150,'専用封筒A5・専用資材+¥20・郵便ポストのみ',true,null,'ラクマ'],
+    ['かんたんラクマパック(日本郵便)','ゆうパケットポスト',60,34,3,2,175,'A4 3辺合計60cm以内・専用シール¥5/枚 or 専用箱¥65',false,null,'ラクマ'],
+    ['かんたんラクマパック(日本郵便)','ゆうパケット',60,34,3,1,200,'A4 3辺合計60cm以内',true,null,'ラクマ'],
+    ['かんたんラクマパック(日本郵便)','ゆうパケットプラス',null,24,7,2,380,'専用箱24×17×7cm・専用箱+¥65',false,null,'ラクマ'],
+    ['かんたんラクマパック(日本郵便)','ゆうパック60サイズ',null,null,null,25,700,'A4より大きい商品向け',false,null,'ラクマ'],
+    ['かんたんラクマパック(ヤマト運輸)','ネコポス',60,34,3,1,200,'小型サイズA4・3辺60cm以内長辺34cm3cm以内',true,null,'ラクマ'],
+    ['かんたんラクマパック(ヤマト運輸)','宅急便コンパクト',null,null,0.8,999,430,'薄型専用BOX(A4)34×24.8×0.8cm程度 or 専用BOX(50サイズまで)20×25×5cm・専用BOX+¥70',false,null,'ラクマ'],
+    ['かんたんラクマパック(ヤマト運輸)','こねこ便420',null,34,3,null,420,'専用封筒A4 34×24.8×3cm',false,null,'ラクマ'],
+    ['かんたんラクマパック(ヤマト運輸)','宅急便60サイズ〜(2kg)',null,null,null,2,650,'A4より大きい商品向け・30kg以内',false,null,'ラクマ'],
+  ];
+  for(const d of defaults){
+    await addDocTo('shippingMethods', {provider:d[0], name:d[1], sanpen:d[2], nagahen:d[3], thickness:d[4], weight:d[5], price:d[6], note:d[7], visible:d[8], serviceGroup:d[9]||null, platformGroup:d[10]||'個人'});
+  }
+}
+async function maybeSeedPackingMethods(){
+  if(seededFlags.pack) return;
+  if(state.packingMethods.length>0){ seededFlags.pack=true; return; }
+  seededFlags.pack = true;
+  // name, category, baseThicknessMm, baseWeightG, unitThicknessMm(1個/1枚あたり増分), unitWeightG(同左), note, procedureText, visible, bubbleLayers, boardSheets
+  const defaults = [
+    ['缶バッジ(57mm)','缶バッジ57mm',0,0,15,16,'','プチプチ2重→水濡れ防止OPP袋', true, 2, 0],
+    ['缶バッジ(75mm)','缶バッジ76mm',0,0,17,24,'','プチプチ2重→水濡れ防止OPP袋', false, 2, 0],
+    ['アクキー・アクスタ(〜12cm)','アクリルキーホルダー',0,0,17,29,'','プチプチ3重→水濡れ防止OPP袋', true, 3, 0],
+    ['大型アクスタ(15cm〜)','アクリルスタンド',0,0,20,74,'個別巻き推奨・50gを超えるため100g内料金になりやすい','プチプチ3重→水濡れ防止OPP袋（個別巻き）', true, 3, 0],
+    ['ラバーストラップ','ラバーストラップ',0,0,9,18,'','プチプチ1重→水濡れ防止OPP袋', true, 1, 0],
+    ['ぬいぐるみ','ぬいぐるみ',0,0,50,45,'厚さ3cm超のため定形外郵便(規格外)扱い','プチプチ1重→水濡れ防止OPP袋', true, 1, 0],
+    ['トレカ','トレカ',5,11.7,1,3.3,'1枚:0.6cm/15g・10枚:1.5cm/45g換算（固定分＋1枚あたり増分）','1枚ずつスリーブ→両面段ボール補強→水濡れ防止OPP袋', true, 0, 2],
+    ['ポストカード','ポストカード',5,15,1,5,'1枚:0.6cm/20g・10枚:1.5cm/65g換算','両面段ボール補強→水濡れ防止OPP袋', false, 0, 2],
+    ['コースター','コースター',4.4,10,0.6,2,'1枚:0.5cm/12g・10枚:1.0cm/30g換算','両面段ボール補強→水濡れ防止OPP袋', true, 0, 2],
+    ['厚紙コースター','厚紙コースター',8,16.7,5,18.3,'1枚:1.3cm/35g・10枚:5.8cm/200g換算','両面段ボール補強→水濡れ防止OPP袋', false, 0, 2],
+    ['ミニ色紙','ミニ色紙',0,0,6,27,'約120×135mm・1枚の目安値','両面段ボール補強→水濡れ防止OPP袋', false, 0, 2],
+    ['色紙','色紙',0,0,8,115,'','両面段ボール補強→水濡れ防止OPP袋', true, 0, 2],
+    ['クリアファイル','クリアファイル',0,0,4,20,'','両面段ボール補強→水濡れ防止OPP袋', false, 0, 2],
+    ['うちわ','うちわ',0,0,8,40,'','両面段ボール補強→水濡れ防止OPP袋', false, 0, 2],
+    ['アパレル','アパレル',0,0,15,150,'','畳んでOPP袋または宅配ビニール袋', false, 0, 0],
+  ];
+  for(const d of defaults){
+    await addDocTo('packingMethods', {name:d[0], category:d[1], baseThicknessMm:d[2], baseWeightG:d[3], unitThicknessMm:d[4], unitWeightG:d[5], note:d[6], procedureText:d[7], visible:d[8], bubbleLayers:d[9], boardSheets:d[10]});
+  }
+}
+async function maybeSeedPlatforms(){
+  if(seededFlags.platform) return;
+  if(state.platforms.length>0){ seededFlags.platform=true; return; }
+  seededFlags.platform = true;
+  const defaults = [
+    ['メルカリ',10],
+    ['ヤフーフリマ',5],
+    ['ヤフオク!',10],
+    ['ラクマ',6],
+  ];
+  for(const d of defaults){ await addDocTo('platforms', {name:d[0], feeRate:d[1]}); }
+}
+
+/* ---------------- テーマピッカー ---------------- */
+document.getElementById('themeBtn').onclick = ()=>{
+  const host=document.getElementById('modalHost');
+  host.innerHTML = `<div class="modal-overlay center" id="themeOverlay"><div class="modal">
+    <h3>テーマを選択</h3>
+    <div class="theme-grid">${THEMES.map(t=>`
+      <div class="theme-opt ${state.theme===t.key?'active':''}" data-theme-key="${t.key}">
+        <div class="swatch" style="background:${t.preview}"></div><div class="label">${t.label}</div>
+      </div>`).join('')}</div>
+    <div class="modal-actions"><button class="btn btn-ghost btn-block" id="closeThemeModal">閉じる</button></div>
+  </div></div>`;
+  document.getElementById('closeThemeModal').onclick = closeModal;
+  document.getElementById('themeOverlay').onclick=(e)=>{ if(e.target.id==='themeOverlay') closeModal(); };
+  host.querySelectorAll('.theme-opt').forEach(el=>{ el.onclick=async()=>{ await saveTheme(el.dataset.themeKey); closeModal(); }; });
+};
+
+document.getElementById('tabbar').addEventListener('click',(e)=>{
+  const btn=e.target.closest('button[data-tab]'); if(!btn) return;
+  ui.tab = btn.dataset.tab; render();
+});
+
+/* ================= レンダリング統括 ================= */
+function render(){
+  applyTheme();
+  const scrollY = window.scrollY;
+  document.querySelectorAll('#tabbar button').forEach(b=>b.classList.toggle('active', b.dataset.tab===ui.tab));
+  const main = document.getElementById('mainArea');
+  if(ui.tab==='dashboard'){ main.innerHTML = renderDashboardTab(); bindDashboardEvents(); }
+  else if(ui.tab==='master'){ main.innerHTML = renderMaster(); bindMasterEvents(); }
+  else if(ui.tab==='items'){ main.innerHTML = renderItemsTab(); bindItemsEvents(); }
+  else if(ui.tab==='sale'){ main.innerHTML = renderSaleTab(); bindSaleEvents(); }
+  else if(ui.tab==='exchange'){ main.innerHTML = renderExchangeTab(); bindExchangeEvents(); }
+  else if(ui.tab==='history'){ main.innerHTML = renderHistoryTab(); bindHistoryEvents(); }
+  window.scrollTo(0, scrollY);
+}
+
+/* ================================================================
+   ⓪ ホーム（ダッシュボード）
+   ================================================================ */
+function renderDashboardTab(){
+  const activeEx = state.exchangeRecords.filter(r=>r.status!=='完了');
+  const shippingAlerts = activeEx.map(r=>({r, msg:exchangeReminder(r)})).filter(x=>x.msg);
+  const followStalled = activeEx.filter(r=>['フォロー待ち','DM待ち'].includes(r.status) && daysSince(r.statusUpdatedAt||r.date)>=FOLLOW_REMINDER_DAYS);
+  const negotiationStalled = activeEx.filter(r=>r.status==='交渉中' && daysSince(r.statusUpdatedAt||r.date)>=NEGOTIATION_REMINDER_DAYS);
+  const listingStalled = state.items.filter(it=>it.saleStatus==='出品中' && daysSince(it.saleStatusDate)>=LISTING_REMINDER_DAYS);
+  const thisMonth = todayStr().slice(0,7);
+  const monthExchangeCount = state.exchangeRecords.filter(r=>(r.date||'').slice(0,7)===thisMonth).length;
+  const monthSoldItems = state.items.filter(i=>['売却済み','発送済み'].includes(i.saleStatus) && i.soldDate && i.soldDate.slice(0,7)===thisMonth);
+  const monthProfit = monthSoldItems.reduce((s,i)=>s+(i.profitAmount||0),0);
+
+  // 推し別グッズ増加数（今月・グッズ帳連携データより）
+  const monthGoodsItems = state.goodsItems.filter(i=>(i.date||'').slice(0,7)===thisMonth);
+  const byChar = {};
+  monthGoodsItems.forEach(i=>{ byChar[i.characterId] = (byChar[i.characterId]||0) + (Number(i.qty)||1); });
+  const charStats = Object.keys(byChar).map(cid=>{
+    const ch = state.goodsCharacters.find(c=>c.id===cid);
+    return { name: ch?ch.name:'（不明）', count: byChar[cid] };
+  }).sort((a,b)=>b.count-a.count);
+
+  return `
+    <div class="card"><h2>📬 発送アラート <span class="badge">${shippingAlerts.length}件</span></h2>
+      ${shippingAlerts.length ? shippingAlerts.map(x=>{
+        return `<div class="list-item"><div><div class="meta">${escapeHtml(partnerLabel(x.r))}</div><div class="sub-meta">${escapeHtml(x.msg)}</div></div></div>`;
+      }).join('') : `<div class="empty">今日・明日発送予定のものはありません</div>`}
+    </div>
+    <div class="card"><h2>📨 フォロー・DM停滞中 <span class="badge">${followStalled.length}件</span></h2>
+      ${followStalled.length ? followStalled.map(r=>{
+        return `<div class="list-item"><div><div class="meta">${escapeHtml(partnerLabel(r))}</div><div class="sub-meta">${escapeHtml(r.status)}のまま${daysSince(r.statusUpdatedAt||r.date)}日経過</div></div></div>`;
+      }).join('') : `<div class="empty">停滞中のフォロー・DM待ちはありません</div>`}
+    </div>
+    <div class="card"><h2>⏰ 交渉停滞中 <span class="badge">${negotiationStalled.length}件</span></h2>
+      ${negotiationStalled.length ? negotiationStalled.map(r=>{
+        return `<div class="list-item"><div><div class="meta">${escapeHtml(partnerLabel(r))}</div><div class="sub-meta">${daysSince(r.statusUpdatedAt||r.date)}日停滞中</div></div></div>`;
+      }).join('') : `<div class="empty">停滞中の交渉はありません</div>`}
+    </div>
+    <div class="card"><h2>📦 出品長期化 <span class="badge">${listingStalled.length}件</span></h2>
+      ${listingStalled.length ? listingStalled.map(it=>`<div class="list-item"><div><div class="meta">${escapeHtml(it.name)}</div><div class="sub-meta">出品から${daysSince(it.saleStatusDate)}日経過</div></div></div>`).join('') : `<div class="empty">長期化している出品はありません</div>`}
+    </div>
+    <div class="card"><h2>📊 今月のサマリー</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="label">今月の交換件数</div><div class="value">${monthExchangeCount}件</div></div>
+        <div class="stat-box"><div class="label">今月の売買利益</div><div class="value">${yen(monthProfit)}</div></div>
+      </div>
+    </div>
+    <div class="card"><h2>🎀 推し別グッズ増加数（今月・グッズ帳連携）</h2>
+      ${charStats.length ? renderBarChart(charStats.map(c=>c.name), charStats.map(c=>c.count)) : `<div class="empty">今月はまだグッズ帳への追加がありません</div>`}
+    </div>`;
+}
+function renderBarChart(labels, values){
+  const max = Math.max(...values, 1);
+  return `<div style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">
+    ${labels.map((l,i)=>`
+      <div>
+        <div style="display:flex; justify-content:space-between; font-size:11.5px; margin-bottom:3px;"><span>${escapeHtml(l)}</span><span style="font-weight:800; color:var(--accent);">${values[i]}個</span></div>
+        <div style="background:var(--surface2); border-radius:8px; height:10px; overflow:hidden;"><div style="width:${Math.max(4,Math.round(values[i]/max*100))}%; height:100%; background:var(--accent);"></div></div>
+      </div>`).join('')}
+  </div>`;
+}
+function bindDashboardEvents(){}
+
+/* ================================================================
+   ① マスタ管理
+   ================================================================ */
+const MASTER_SUBS = [
+  {key:'genre', label:'ジャンル/推し'},
+  {key:'ship', label:'発送方法'},
+  {key:'pack', label:'梱包方法'},
+  {key:'dm', label:'DMテンプレ'},
+];
+function renderMaster(){
+  let body='';
+  if(ui.masterSub==='genre') body = renderGenreSection();
+  else if(ui.masterSub==='ship') body = renderShipSection();
+  else if(ui.masterSub==='pack') body = renderPackSection();
+  else if(ui.masterSub==='dm') body = renderDmSection();
+  return `<div class="section-tabs">${MASTER_SUBS.map(s=>`<button data-sub="${s.key}" class="${ui.masterSub===s.key?'active':''}">${s.label}</button>`).join('')}</div>${body}
+    <div class="hint" style="margin-top:10px;">出品先プラットフォームの手数料は初期設定として自動で使われます</div>`;
+}
+
+function renderGenreSection(){
+  const list = state.genres.length ? state.genres.map(g=>`
+    <div class="genre-block" data-genre-id="${g.id}">
+      <div class="genre-head"><div class="genre-name">${escapeHtml(g.name)}</div>
+        <div class="actions"><button class="iconsm" data-act="add-oshi" data-id="${g.id}">➕推し</button><button class="iconsm" data-act="del-genre" data-id="${g.id}">🗑️</button></div>
+      </div>
+      <div>${(g.oshiList||[]).map(o=>`<span class="oshi-chip">${escapeHtml(o.name)}<button data-act="del-oshi" data-gid="${g.id}" data-oid="${o.id}">✕</button></span>`).join('') || '<span style="font-size:12px;color:var(--sub);">推し未登録</span>'}</div>
+    </div>`).join('') : `<div class="empty">まだジャンルが登録されていません</div>`;
+  return `<div class="card"><h2>ジャンル / 推し一覧</h2>${list}
+    <button class="btn btn-primary btn-block" id="addGenreBtn" style="margin-top:8px;">＋ ジャンルを追加</button>
+    <div class="hint">例）VTuber → イブラヒム / アニメ → 衛藤桐也 のように追加できます</div></div>`;
+}
+/* 厚み(cm)・重さ(kg)から条件を満たす発送方法を安い順に返す（サイズは長辺のみわかる想定のため長辺・厚さ・重量のみで判定） */
+function recommendShippingMethods(thicknessCm, weightKg){
+  return state.shippingMethods.filter(s=>{
+    if(s.thickness!=null && thicknessCm>s.thickness) return false;
+    if(s.weight!=null && weightKg>s.weight) return false;
+    return true;
+  }).sort((a,b)=>{
+    const pa = a.price>=0 ? a.price : Infinity;
+    const pb = b.price>=0 ? b.price : Infinity;
+    return pa-pb;
+  });
+}
+function renderShipSection(){
+  const PLATFORM_ORDER = ['個人','メルカリ','ヤフーフリマ','ラクマ'];
+  const platforms = {};
+  state.shippingMethods.forEach(s=>{ const pg=s.platformGroup||'個人'; (platforms[pg]=platforms[pg]||[]).push(s); });
+  const body = PLATFORM_ORDER.filter(pg=>platforms[pg]).map(pg=>{
+    const groups = {};
+    platforms[pg].forEach(s=>{ (groups[s.provider||'その他']=groups[s.provider||'その他']||[]).push(s); });
+    const visibleCount = platforms[pg].filter(s=>s.visible).length;
+    const inner = Object.keys(groups).map(prov=>`
+      <div style="margin-bottom:12px;">
+        <div style="font-size:12px; font-weight:800; color:var(--accent); margin-bottom:6px;">${escapeHtml(prov)}</div>
+        ${groups[prov].map(s=>{
+          const sizeTxt = [s.sanpen?`3辺${s.sanpen}cm`:null, s.nagahen?`長辺${s.nagahen}cm`:null, (s.thickness&&s.thickness<999)?`厚さ${s.thickness}cm`:null, s.weight?`${s.weight}kg`:null].filter(Boolean).join('・');
+          const priceTxt = s.price>=0 ? yen(s.price) : '料金別途';
+          return `<div class="list-item">
+            <div style="flex:1;">
+              <div class="meta">${escapeHtml(s.name)}${s.serviceGroup?` <span class="tag">${escapeHtml(s.serviceGroup)}</span>`:''}　<span style="font-weight:700; color:var(--accent);">${priceTxt}</span></div>
+              <div class="sub-meta">${sizeTxt}${s.note?'　'+escapeHtml(s.note):''}</div>
+            </div>
+            <div class="actions">
+              <label class="toggle"><input type="checkbox" data-act="toggle-ship" data-id="${s.id}" ${s.visible?'checked':''}><span class="slider"></span></label>
+            </div></div>`;
+        }).join('')}
+      </div>`).join('');
+    return `<details data-pg="${escapeHtml(pg)}" style="margin-bottom:10px;" ${ui.shipOpenGroups[pg]?'open':''}>
+      <summary style="cursor:pointer; font-size:13px; font-weight:800; padding:10px 12px; background:var(--surface2); border-radius:10px; list-style:none;">${escapeHtml(pg)} <span class="badge" style="margin-left:6px;">${visibleCount}件表示中</span></summary>
+      <div style="padding:10px 4px 0;">${inner}</div>
+    </details>`;
+  }).join('') || `<div class="empty">まだ発送方法がありません</div>`;
+  return `
+    <div class="card">
+      <h2>📦 発送方法おすすめ診断</h2>
+      <div class="row2">
+        <div><label class="field">厚み合計（mm）</label><input type="number" id="shipDiagThick" placeholder="例）8"></div>
+        <div><label class="field">重さ合計（g）</label><input type="number" id="shipDiagWeight" placeholder="例）30"></div>
+      </div>
+      <button class="btn btn-primary btn-block" id="shipDiagBtn" style="margin-top:8px;">診断する</button>
+      <div id="shipDiagResult" style="margin-top:10px;"></div>
+      <div class="hint">グッズ管理・梱包方法の「厚み・重さ」を合計して入れると、条件を満たす発送方法を安い順に表示します（マスタ登録済みの全件から診断・非表示のものも含みます）</div>
+    </div>
+    <div class="card"><h2>発送方法プリセット <span class="badge">${state.shippingMethods.filter(s=>s.visible).length}件 表示中</span></h2>
+    ${body}
+    <div class="hint">個人向け／メルカリ／ヤフーフリマ／ラクマでタップして開閉できます。スイッチONのものだけがグッズ管理・売買管理・DM生成で使われます</div></div>`;
+}
+function renderPackSection(){
+  const list = state.packingMethods.length ? state.packingMethods.map(p=>{
+    const hasBase = (p.baseThicknessMm||0)>0 || (p.baseWeightG||0)>0;
+    const sizeTxt = hasBase
+      ? `固定分約${p.baseThicknessMm||0}mm/${p.baseWeightG||0}g＋1枚あたり約${p.unitThicknessMm}mm/${p.unitWeightG||0}g`
+      : `1個あたり約${p.unitThicknessMm}mm・約${p.unitWeightG||0}g`;
+    return `
+    <div class="list-item"><div style="flex:1;"><div class="meta">${escapeHtml(p.name)}${p.category?` <span class="tag">${escapeHtml(p.category)}</span>`:''}</div><div class="sub-meta">${sizeTxt}　${escapeHtml(p.note||'')}</div>
+    ${p.procedureText?`<div class="sub-meta" style="white-space:pre-wrap; margin-top:4px;">📝 ${escapeHtml(p.procedureText)}</div>`:''}</div>
+    <div class="actions">
+      <label class="toggle"><input type="checkbox" data-act="toggle-pack" data-id="${p.id}" ${p.visible!==false?'checked':''}><span class="slider"></span></label>
+      <button class="iconsm" data-act="edit-pack" data-id="${p.id}">✏️</button><button class="iconsm" data-act="del-pack" data-id="${p.id}">🗑️</button></div></div>`;
+  }).join('') : `<div class="empty">まだ梱包方法がありません</div>`;
+  return `<div class="card"><h2>梱包方法プリセット</h2>${list}
+    <button class="btn btn-primary btn-block" id="addPackBtn" style="margin-top:8px;">＋ 梱包方法を追加</button>
+    <div class="hint">紙類は「まとめて梱包」時の固定分（段ボール台紙+OPP袋）と1枚あたりの増分を分けて計算。表示/非表示・手順の編集はいつでもできます</div></div>`;
+}
+const DEFAULT_SCENES = ['交換依頼時','条件提示時','発送完了報告時','お礼・受取確認時'];
+function renderDmSection(){
+  const allScenes = [...new Set([...DEFAULT_SCENES, ...state.dmTemplates.map(t=>t.scene)])];
+  const groups = allScenes.map(scene=>{
+    const items = state.dmTemplates.filter(t=>t.scene===scene);
+    return `<div style="margin-bottom:14px;"><div style="font-size:12.5px; font-weight:800; color:var(--accent); margin-bottom:6px;">${escapeHtml(scene)}</div>
+      ${items.length? items.map(t=>`<div class="list-item"><div class="meta">${escapeHtml(t.name)}</div>
+        <div class="actions"><button class="iconsm" data-act="edit-dm" data-id="${t.id}">✏️</button><button class="iconsm" data-act="del-dm" data-id="${t.id}">🗑️</button></div></div>`).join('') : `<div style="font-size:12px; color:var(--sub); padding:4px 2px 8px;">未登録</div>`}
+      </div>`;
+  }).join('');
+  return `<div class="card"><h2>DMテンプレート <span class="badge">シーン別</span></h2>${groups}
+    <button class="btn btn-primary btn-block" id="addDmBtn" style="margin-top:4px;">＋ テンプレートを追加</button>
+    <div class="hint">本文に［発送方法］［梱包方法］［金額］などを入れておくと交換記録画面で選択挿入できます</div></div>`;
+}
+
+function bindMasterEvents(){
+  document.querySelectorAll('.section-tabs button[data-sub]').forEach(b=>{ b.onclick=()=>{ ui.masterSub=b.dataset.sub; render(); }; });
+
+  const addGenreBtn=document.getElementById('addGenreBtn');
+  if(addGenreBtn) addGenreBtn.onclick=()=>openTextModal({title:'ジャンルを追加', placeholder:'例）VTuber / アニメ', onSave: async(v)=>{ if(!v.trim())return; await addDocTo('genres',{name:v.trim(),oshiList:[]}); showToast('追加しました'); }});
+  document.querySelectorAll('[data-act="del-genre"]').forEach(b=>b.onclick=async()=>{ if(confirm('このジャンルを削除しますか？（中の推しも削除されます）')){ await deleteDocIn('genres', b.dataset.id); showToast('削除しました'); } });
+  document.querySelectorAll('[data-act="add-oshi"]').forEach(b=>b.onclick=()=>openTextModal({title:'推しを追加', placeholder:'例）イブラヒム', onSave: async(v)=>{ if(!v.trim())return; const g=state.genres.find(x=>x.id===b.dataset.id); await updateDocIn('genres', b.dataset.id, {oshiList:[...(g.oshiList||[]),{id:uidGen(),name:v.trim()}]}); showToast('追加しました'); }}));
+  document.querySelectorAll('[data-act="del-oshi"]').forEach(b=>b.onclick=async()=>{ const g=state.genres.find(x=>x.id===b.dataset.gid); await updateDocIn('genres', b.dataset.gid, {oshiList:(g.oshiList||[]).filter(o=>o.id!==b.dataset.oid)}); });
+
+  document.querySelectorAll('details[data-pg]').forEach(d=>{ d.addEventListener('toggle', ()=>{ ui.shipOpenGroups[d.dataset.pg] = d.open; }); });
+  document.querySelectorAll('[data-act="toggle-ship"]').forEach(b=>b.onchange=async()=>{ await updateDocIn('shippingMethods', b.dataset.id, {visible: b.checked}); });
+  const shipDiagBtn=document.getElementById('shipDiagBtn');
+  if(shipDiagBtn) shipDiagBtn.onclick=()=>{
+    const thickMm = Number(document.getElementById('shipDiagThick').value)||0;
+    const weightG = Number(document.getElementById('shipDiagWeight').value)||0;
+    const thickCm = thickMm/10, weightKg = weightG/1000;
+    const results = recommendShippingMethods(thickCm, weightKg);
+    const box = document.getElementById('shipDiagResult');
+    if(!results.length){ box.innerHTML = `<div class="empty">条件に合う発送方法が見つかりませんでした（サイズオーバーの可能性）</div>`; return; }
+    box.innerHTML = results.map((s,i)=>`
+      <div class="list-item">
+        <div>
+          <div class="meta">${i===0?'👑 ':''}${escapeHtml(s.name)}${s.serviceGroup?` <span class="tag">${escapeHtml(s.serviceGroup)}</span>`:''} ${s.visible?'':'<span class="tag">非表示中</span>'}</div>
+          <div class="sub-meta">${escapeHtml(s.provider||'')}　${s.price>=0?yen(s.price):'料金別途'}</div>
+        </div>
+      </div>`).join('') + `<div class="hint">サイズ・料金は目安であり保証はしません。安い順に表示しています</div>`;
+  };
+
+  const addPackBtn=document.getElementById('addPackBtn'); if(addPackBtn) addPackBtn.onclick=()=>openPackModal({});
+  document.querySelectorAll('[data-act="edit-pack"]').forEach(b=>b.onclick=()=>openPackModal(state.packingMethods.find(p=>p.id===b.dataset.id)));
+  document.querySelectorAll('[data-act="del-pack"]').forEach(b=>b.onclick=async()=>{ if(confirm('削除しますか？')){ await deleteDocIn('packingMethods', b.dataset.id); showToast('削除しました'); } });
+  document.querySelectorAll('[data-act="toggle-pack"]').forEach(b=>b.onchange=async()=>{ await updateDocIn('packingMethods', b.dataset.id, {visible: b.checked}); });
+
+  const addDmBtn=document.getElementById('addDmBtn'); if(addDmBtn) addDmBtn.onclick=()=>openDmModal({});
+  document.querySelectorAll('[data-act="edit-dm"]').forEach(b=>b.onclick=()=>openDmModal(state.dmTemplates.find(t=>t.id===b.dataset.id)));
+  document.querySelectorAll('[data-act="del-dm"]').forEach(b=>b.onclick=async()=>{ if(confirm('削除しますか？')){ await deleteDocIn('dmTemplates', b.dataset.id); showToast('削除しました'); } });
+}
+
+/* ---- モーダル：共通系 ---- */
+function openTextModal({title,placeholder,initial='',onSave}){
+  const host=document.getElementById('modalHost');
+  host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>${escapeHtml(title)}</h3>
+    <div class="field-group"><input type="text" id="mInput" placeholder="${escapeHtml(placeholder||'')}" value="${escapeHtml(initial)}"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">キャンセル</button><button class="btn btn-primary" id="mSave">保存</button></div>
+  </div></div>`;
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+  document.getElementById('mSave').onclick=async()=>{ await onSave(document.getElementById('mInput').value); closeModal(); };
+}
+const CATEGORY_THICKNESS_MM = {
+  '缶バッジ25mm':1.5, '缶バッジ32mm':2, '缶バッジ38mm':2, '缶バッジ44mm':2.5, '缶バッジ57mm':3, '缶バッジ76mm':3.5,
+  '缶バッジ(四角形)':2, '缶バッジ(ハート型)':2.5,
+  '缶ミラー':4, 'ピンバッジ':3, 'アクリルキーホルダー':4, 'アクリルスタンド':5,
+  'アクリルスタンド(小)':4, 'アクリルスタンド(大)':6, 'トレカ':0.3, 'ブロマイド':0.3, 'ポストカード':0.3,
+  '色紙':1, 'クリアファイル':0.5, 'うちわ':5, 'ラバーストラップ':4, 'フォト風カード':0.3,
+  'ぬいぐるみ':50, 'Tシャツ':15, 'アパレル':15,
+};
+// 缶バッジは教えてもらった実測重量、それ以外は目安
+const CATEGORY_WEIGHT_G = {
+  '缶バッジ25mm':2, '缶バッジ32mm':3, '缶バッジ38mm':5, '缶バッジ44mm':6, '缶バッジ57mm':10, '缶バッジ76mm':18,
+  '缶バッジ(四角形)':5, '缶バッジ(ハート型)':9,
+  '缶ミラー':15, 'ピンバッジ':5, 'アクリルキーホルダー':10, 'アクリルスタンド':15,
+  'アクリルスタンド(小)':10, 'アクリルスタンド(大)':25, 'トレカ':1, 'ブロマイド':2, 'ポストカード':2,
+  '色紙':15, 'クリアファイル':10, 'うちわ':20, 'ラバーストラップ':8, 'フォト風カード':2,
+  'ぬいぐるみ':100, 'Tシャツ':150, 'アパレル':150,
+};
+// プチプチ・段ボール補強など、梱包材そのものが1層あたり足す厚み(mm)・重さ(g)の目安
+const BUBBLE_MM_PER_LAYER = 2.5, BUBBLE_G_PER_LAYER = 2;
+const BOARD_MM_PER_SHEET = 1.5, BOARD_G_PER_SHEET = 5;
+// 紙類は水濡れ防止・両面補強がマスト
+const PAPER_CATEGORIES = ['トレカ','ブロマイド','ポストカード','色紙','クリアファイル','フォト風カード'];
+const ACRYLIC_CATEGORIES = ['アクリルキーホルダー','アクリルスタンド','アクリルスタンド(小)','アクリルスタンド(大)','缶ミラー'];
+function openPackModal(item){
+  const isEdit=!!item.id; const host=document.getElementById('modalHost');
+  host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>${isEdit?'梱包方法を編集':'梱包方法を追加'}</h3>
+    <div class="field-group"><label class="field">名称</label><input type="text" id="pkName" placeholder="例）防水（プチプチ2重）" value="${escapeHtml(item.name||'')}"></div>
+    <div class="field-group"><label class="field">対象カテゴリー</label><input type="text" id="pkCategory" list="pkCatList" placeholder="例）缶バッジ57mm" value="${escapeHtml(item.category||'')}"><datalist id="pkCatList">${Object.keys(CATEGORY_THICKNESS_MM).map(c=>`<option value="${c}">`).join('')}</datalist></div>
+
+    <div class="row2">
+      <div class="field-group"><label class="field">まとめ梱包の固定分（mm・段ボール台紙+OPP袋等）</label><input type="number" id="pkFixedThick" value="${item.baseThicknessMm??0}" step="0.1"></div>
+      <div class="field-group"><label class="field">まとめ梱包の固定分（g）</label><input type="number" id="pkFixedWeight" value="${item.baseWeightG??0}"></div>
+    </div>
+    <div class="hint" style="margin-top:-6px; margin-bottom:10px;">紙類など複数枚まとめて1つの段ボール台紙+OPP袋で梱包する場合の固定分。個別包装するグッズは0のままでOK</div>
+
+    <div class="card" style="background:var(--surface2); border:1px solid var(--border); padding:12px; margin:0 0 12px;">
+      <div style="font-size:11.5px; font-weight:800; margin-bottom:8px;">厚み・重さの自動計算</div>
+      <div class="row2">
+        <div><label class="field">グッズ自体の厚み(mm)</label><input type="number" id="pkBaseThick" value="0" step="0.1"></div>
+        <div><label class="field">グッズ自体の重さ(g)</label><input type="number" id="pkBaseWeight" value="0"></div>
+      </div>
+      <div class="row2" style="margin-top:8px;">
+        <div><label class="field">プチプチ枚数（重ね数）</label><input type="number" id="pkBubbleLayers" value="0" min="0"></div>
+        <div><label class="field">段ボール補強（枚数・片面1/両面2）</label><input type="number" id="pkBoardSheets" value="0" min="0"></div>
+      </div>
+      <div class="hint" style="margin-top:6px;">プチプチ1枚あたり約${BUBBLE_MM_PER_LAYER}mm・${BUBBLE_G_PER_LAYER}g、段ボール補強1枚あたり約${BOARD_MM_PER_SHEET}mm・${BOARD_G_PER_SHEET}gとして自動計算します（下の欄に反映、手直しも可）</div>
+    </div>
+
+    <div class="row2">
+      <div class="field-group"><label class="field">1個/1枚あたりの増分厚み（mm）</label><input type="number" id="pkThick" value="${item.unitThicknessMm??''}" step="0.1"></div>
+      <div class="field-group"><label class="field">1個/1枚あたりの増分重さ（g）</label><input type="number" id="pkWeight" value="${item.unitWeightG??''}"></div>
+    </div>
+    <div class="field-group"><label class="field">メモ</label><input type="text" id="pkNote" value="${escapeHtml(item.note||'')}"></div>
+    <div class="field-group"><label class="field">梱包手順（DM文面に自動挿入）</label><textarea id="pkProcedure" placeholder="例）プチプチ2重→水濡れ防止OPP袋">${escapeHtml(item.procedureText||'')}</textarea></div>
+    <div class="row"><label class="toggle"><input type="checkbox" id="pkVisible" ${item.visible!==false?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px;">一覧に表示する</span></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">キャンセル</button><button class="btn btn-primary" id="mSave">保存</button></div>
+  </div></div>`;
+  function recalcFromParts(){
+    const base = Number(document.getElementById('pkBaseThick').value)||0;
+    const baseW = Number(document.getElementById('pkBaseWeight').value)||0;
+    const layers = Number(document.getElementById('pkBubbleLayers').value)||0;
+    const boards = Number(document.getElementById('pkBoardSheets').value)||0;
+    document.getElementById('pkThick').value = (base + layers*BUBBLE_MM_PER_LAYER + boards*BOARD_MM_PER_SHEET).toFixed(1);
+    document.getElementById('pkWeight').value = Math.round(baseW + layers*BUBBLE_G_PER_LAYER + boards*BOARD_G_PER_SHEET);
+  }
+  document.getElementById('pkCategory').addEventListener('input', (e)=>{
+    const cat = e.target.value.trim();
+    const thick = CATEGORY_THICKNESS_MM[cat], weight = CATEGORY_WEIGHT_G[cat];
+    if(thick!=null) document.getElementById('pkBaseThick').value = thick;
+    if(weight!=null) document.getElementById('pkBaseWeight').value = weight;
+    if(PAPER_CATEGORIES.includes(cat) && !document.getElementById('pkProcedure').value){
+      document.getElementById('pkProcedure').value = '1枚ずつスリーブ等で保護→両面段ボール補強→水濡れ防止OPP袋（紙類は水濡れ防止・両面補強がマストです）';
+      document.getElementById('pkBoardSheets').value = 2;
+    }
+    if(ACRYLIC_CATEGORIES.includes(cat) && !document.getElementById('pkProcedure').value){
+      document.getElementById('pkProcedure').value = 'プチプチ3重→OPP袋（アクリル製品はプチプチ3重が基本です）';
+      document.getElementById('pkBubbleLayers').value = 3;
+    }
+    recalcFromParts();
+  });
+  ['pkBaseThick','pkBaseWeight','pkBubbleLayers','pkBoardSheets'].forEach(id=>document.getElementById(id).addEventListener('input', recalcFromParts));
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+  document.getElementById('mSave').onclick=async()=>{
+    const name=document.getElementById('pkName').value.trim(); if(!name) return;
+    const data={name, category:document.getElementById('pkCategory').value, baseThicknessMm:Number(document.getElementById('pkFixedThick').value)||0, baseWeightG:Number(document.getElementById('pkFixedWeight').value)||0, unitThicknessMm:Number(document.getElementById('pkThick').value)||0, unitWeightG:Number(document.getElementById('pkWeight').value)||0, note:document.getElementById('pkNote').value, procedureText:document.getElementById('pkProcedure').value, visible:document.getElementById('pkVisible').checked};
+    if(isEdit) await updateDocIn('packingMethods', item.id, data); else await addDocTo('packingMethods', data);
+    showToast('保存しました'); closeModal();
+  };
+}
+function openShipModal(item){
+  const isEdit=!!item.id; const host=document.getElementById('modalHost');
+  const providers=['日本郵便','ヤマト運輸','佐川急便','メルカリ便(らくらく)','メルカリ便(ゆうゆう)','おてがる配送(ヤマト)','おてがる配送(日本郵便)','その他'];
+  host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>${isEdit?'発送方法を編集':'発送方法を追加'}</h3>
+    <div class="field-group"><label class="field">事業者/サービス群</label>
+      <select id="sProvider">${providers.map(p=>`<option value="${p}" ${item.provider===p?'selected':''}>${p}</option>`).join('')}</select></div>
+    <div class="field-group"><label class="field">名称</label><input type="text" id="sName" placeholder="例）クリックポスト" value="${escapeHtml(item.name||'')}"></div>
+    <div class="row2">
+      <div class="field-group"><label class="field">3辺合計上限(cm)</label><input type="number" id="sSanpen" value="${item.sanpen??''}"></div>
+      <div class="field-group"><label class="field">長辺上限(cm)</label><input type="number" id="sNagahen" value="${item.nagahen??''}"></div>
+    </div>
+    <div class="row2">
+      <div class="field-group"><label class="field">厚さ上限(cm)</label><input type="number" id="sThickness" value="${item.thickness??''}"></div>
+      <div class="field-group"><label class="field">重量上限(kg)</label><input type="number" id="sWeight" value="${item.weight??''}"></div>
+    </div>
+    <div class="field-group"><label class="field">料金（円・不明なら空欄でOK）</label><input type="number" id="sPrice" value="${item.price??''}"></div>
+    <div class="field-group"><label class="field">メモ</label><input type="text" id="sNote" value="${escapeHtml(item.note||'')}"></div>
+    <div class="row"><label class="toggle"><input type="checkbox" id="sVisible" ${item.visible!==false?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px;">一覧に表示する</span></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">キャンセル</button><button class="btn btn-primary" id="mSave">保存</button></div>
+  </div></div>`;
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+  document.getElementById('mSave').onclick=async()=>{
+    const name=document.getElementById('sName').value.trim(); if(!name) return;
+    const data={
+      provider:document.getElementById('sProvider').value, name,
+      sanpen:document.getElementById('sSanpen').value?Number(document.getElementById('sSanpen').value):null,
+      nagahen:document.getElementById('sNagahen').value?Number(document.getElementById('sNagahen').value):null,
+      thickness:document.getElementById('sThickness').value?Number(document.getElementById('sThickness').value):null,
+      weight:document.getElementById('sWeight').value?Number(document.getElementById('sWeight').value):null,
+      price:document.getElementById('sPrice').value?Number(document.getElementById('sPrice').value):-1,
+      note:document.getElementById('sNote').value,
+      visible:document.getElementById('sVisible').checked,
+    };
+    if(isEdit) await updateDocIn('shippingMethods', item.id, data); else await addDocTo('shippingMethods', data);
+    showToast('保存しました'); closeModal();
+  };
+}
+function openDmModal(item){
+  const isEdit=!!item.id; const host=document.getElementById('modalHost');
+  host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>${isEdit?'DMテンプレートを編集':'DMテンプレートを追加'}</h3>
+    <div class="field-group"><label class="field">シーン</label><input type="text" id="dScene" list="sceneList" value="${escapeHtml(item.scene||'')}"><datalist id="sceneList">${DEFAULT_SCENES.map(s=>`<option value="${s}">`).join('')}</datalist></div>
+    <div class="field-group"><label class="field">テンプレート名</label><input type="text" id="dName" value="${escapeHtml(item.name||'')}"></div>
+    <div class="field-group"><label class="field">本文</label><textarea id="dBody" placeholder="発送方法は［発送方法］、梱包は［梱包方法］を予定しています。">${escapeHtml(item.body||'')}</textarea>
+      <div class="hint">［発送方法］［梱包方法］［金額］などのプレースホルダーが交換記録画面で選択挿入されます</div></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">キャンセル</button><button class="btn btn-primary" id="mSave">保存</button></div>
+  </div></div>`;
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+  document.getElementById('mSave').onclick=async()=>{
+    const scene=document.getElementById('dScene').value.trim(); const name=document.getElementById('dName').value.trim();
+    if(!scene||!name) return;
+    const data={scene,name,body:document.getElementById('dBody').value};
+    if(isEdit) await updateDocIn('dmTemplates', item.id, data); else await addDocTo('dmTemplates', data);
+    showToast('保存しました'); closeModal();
+  };
+}
+
+/* ================================================================
+   ② ダブりグッズ管理
+   ================================================================ */
+function allCharacterNameOptions(){
+  const fromOshi = allOshiList().map(o=>o.oshiName);
+  const fromItems = state.items.map(i=>i.oshiName).filter(Boolean);
+  return [...new Set([...fromOshi, ...fromItems])];
+}
+function renderItemsTab(){
+  let filtered = ui.itemsFilterRelease==='ALL' ? state.releases : state.releases.filter(r=>r.id===ui.itemsFilterRelease);
+  const filterBtns = `<div class="filter-select">
+    <button data-release="ALL" class="${ui.itemsFilterRelease==='ALL'?'active':''}">すべて</button>
+    ${state.releases.map(r=>`<button data-release="${r.id}" class="${ui.itemsFilterRelease===r.id?'active':''}">${escapeHtml(r.name)}</button>`).join('')}
+  </div>`;
+  const body = filtered.length ? filtered.map(renderReleaseCard).join('') : `<div class="empty">まだグッズ（リリース）が登録されていません</div>`;
+  return `<div class="card"><h2>グッズ管理 <span class="badge">${state.releases.length}件のリリース</span></h2>
+    ${filterBtns}${body}
+    <div class="row" style="margin-top:8px;">
+      <button class="btn btn-ghost" style="flex:1;" id="addReleaseBtn">＋ グッズを追加</button>
+      <button class="btn btn-primary" style="flex:1;" id="ssItemBtn">📸 スクショ読取</button>
+    </div></div>`;
+}
+function renderReleaseCard(release){
+  const entries = state.items.filter(i=>i.releaseId===release.id).sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0));
+  const giveEntries = entries.filter(e=>!e.isWanted);
+  const wantEntries = entries.filter(e=>e.isWanted);
+  return `<div class="release-block" data-release-id="${release.id}" style="border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:14px; background:var(--surface);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <div style="font-size:13.5px; font-weight:800;">${escapeHtml(release.name)}</div>
+      <div style="font-size:11px; color:var(--sub);">定価 ${yen(release.definedPrice)}${release.packingCategory?'・'+escapeHtml(release.packingCategory):''}</div>
+    </div>
+    ${giveEntries.length ? `<div class="item-grid">${giveEntries.map(renderItemGridCard).join('')}</div>` : `<div class="hint">譲れる絵柄はまだ登録されていません</div>`}
+    ${wantEntries.length ? `
+      <div style="border:2px dashed var(--gold); border-radius:12px; padding:10px; margin-top:10px; background:var(--surface2);">
+        <div style="font-size:11px; font-weight:800; color:#8A6A00; margin-bottom:6px;">🔍 求めてる絵柄</div>
+        ${wantEntries.map(renderWantRow).join('')}
+      </div>` : ''}
+    <div class="row" style="margin-top:8px; gap:6px;">
+      <button class="btn btn-ghost btn-sm" style="flex:1;" data-act="add-entry" data-release="${release.id}">＋ 絵柄を追加</button>
+      <button class="btn btn-ghost btn-sm" style="flex:1;" data-act="bulk-entry" data-release="${release.id}">＋ キャラ複数一括</button>
+      <button class="iconsm" data-act="del-release" data-id="${release.id}">🗑️</button>
+    </div>
+  </div>`;
+}
+function renderItemGridCard(it){
+  const pending = calcPendingOutQty(it.id);
+  const thumbStyle = it.imageUrl ? `style="background-image:url('${it.imageUrl}')"` : '';
+  return `<div class="item-grid-card" data-item-id="${it.id}">
+    <div class="thumb" ${thumbStyle}>${it.imageUrl?'':'🖼️'}
+      <span class="qty-badge">×${it.totalQty||0}</span>
+      ${it.pinned?'<span class="pin-badge">📌</span>':''}
+      <button class="del-badge" data-act="del-item" data-id="${it.id}">✕</button>
+    </div>
+    <div class="info">
+      <div class="gname">${escapeHtml(it.oshiName||'')}</div>
+      <div class="gtag">${escapeHtml(it.name||'')}</div>
+      ${it.hasDamage?`<div class="damage-badge">⚠️ ${escapeHtml(it.damageNote||'難あり')}</div>`:''}
+      ${pending>0?`<div class="gtag">取引中${pending}→完了後${Math.max(0,(it.totalQty||0)-pending)}予定</div>`:''}
+    </div>
+  </div>`;
+}
+function renderWantRow(it){
+  const secured = calcPendingSecuredQty(it.id);
+  const hasTarget = it.wantedTarget!=null;
+  const statusTxt = hasTarget
+    ? `求${it.wantedTarget}個／確保${it.totalQty||0}個／残り${Math.max(0,it.wantedTarget-(it.totalQty||0))}個`
+    : `上限なし・これまでに${it.totalQty||0}個確保`;
+  return `<div class="list-item" data-item-id="${it.id}">
+    <div><div class="meta">${escapeHtml(it.oshiName||'')} ${it.name?'『'+escapeHtml(it.name)+'』':''} ${it.priority?'<span class="tag">最優先</span>':''}</div>
+      <div class="sub-meta">${statusTxt}${secured>0?`・取引中+${secured}予定`:''}</div></div>
+    <div class="actions"><button class="iconsm" data-act="edit-item" data-id="${it.id}">✏️</button><button class="iconsm" data-act="del-item" data-id="${it.id}">🗑️</button></div>
+  </div>`;
+}
+function bindItemsEvents(){
+  document.querySelectorAll('.filter-select button[data-release]').forEach(b=>b.onclick=()=>{ ui.itemsFilterRelease=b.dataset.release; render(); });
+  const addReleaseBtn=document.getElementById('addReleaseBtn'); if(addReleaseBtn) addReleaseBtn.onclick=()=>openReleaseModal({});
+  const ssBtn=document.getElementById('ssItemBtn'); if(ssBtn) ssBtn.onclick=()=>openScreenshotAnalyzeModal('item');
+  document.querySelectorAll('[data-act="del-release"]').forEach(b=>b.onclick=async()=>{ if(confirm('このグッズ（リリース）と中の絵柄エントリを全て削除しますか？')){ const entries=state.items.filter(i=>i.releaseId===b.dataset.id); for(const e of entries) await deleteDocIn('exchangeItems', e.id); await deleteDocIn('releases', b.dataset.id); showToast('削除しました'); } });
+  document.querySelectorAll('[data-act="add-entry"]').forEach(b=>b.onclick=()=>openItemModal({releaseId:b.dataset.release}));
+  document.querySelectorAll('[data-act="bulk-entry"]').forEach(b=>b.onclick=()=>openBulkItemModal(b.dataset.release));
+  document.querySelectorAll('.item-grid-card').forEach(card=>{
+    card.addEventListener('click', (e)=>{
+      if(e.target.closest('[data-act="del-item"]')) return;
+      openItemModal(state.items.find(i=>i.id===card.dataset.itemId));
+    });
+  });
+  document.querySelectorAll('[data-act="edit-item"]').forEach(b=>b.onclick=()=>openItemModal(state.items.find(i=>i.id===b.dataset.id)));
+  document.querySelectorAll('[data-act="del-item"]').forEach(b=>b.onclick=async(e)=>{ e.stopPropagation(); if(confirm('この絵柄エントリを削除しますか？')){ await deleteDocIn('exchangeItems', b.dataset.id); showToast('削除しました'); } });
+}
+function openReleaseModal(release){
+  const isEdit=!!release.id; const host=document.getElementById('modalHost');
+  const charOptions = allCharacterNameOptions();
+  let rowCount=0;
+  function rowHtml(i){
+    return `<div class="row2" data-crow="${i}" style="margin-bottom:6px;">
+      <input type="text" class="rlChar" list="rlCharList" placeholder="キャラ名">
+      <div class="row" style="gap:4px;"><input type="text" class="rlEntryName" placeholder="絵柄名(任意)" style="width:100%;"><input type="number" class="rlQty" value="1" min="0" style="width:60px;"></div>
+    </div>`;
+  }
+  host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>${isEdit?'グッズを編集':'グッズ（リリース）を追加'}</h3>
+    <div class="field-group"><label class="field">グッズ名（例：Rainy Day Laundry 缶バッジ）</label><input type="text" id="rlName" value="${escapeHtml(release.name||'')}"></div>
+    <div class="field-group"><label class="field">定価（円）</label><input type="number" id="rlPrice" value="${release.definedPrice??''}"></div>
+    <div class="field-group"><label class="field">梱包カテゴリー（梱包方法プリセットと一致させる）</label><input type="text" id="rlPackCat" list="packCatList" value="${escapeHtml(release.packingCategory||'')}"><datalist id="packCatList">${[...new Set(state.packingMethods.map(p=>p.category).filter(Boolean))].map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist></div>
+    ${!isEdit?`
+    <datalist id="rlCharList">${charOptions.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
+    <label class="field">キャラ名・絵柄名・個数（そのまま登録できます）</label>
+    <div id="rlRows">${rowHtml(rowCount++)}</div>
+    <button type="button" class="btn btn-ghost btn-sm" id="rlAddRow" style="margin:6px 0 10px;">＋ 行を追加</button>`:''}
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">キャンセル</button><button class="btn btn-primary" id="mSave">保存</button></div>
+  </div></div>`;
+  const addRowBtn = document.getElementById('rlAddRow');
+  if(addRowBtn) addRowBtn.onclick=()=>{ document.getElementById('rlRows').insertAdjacentHTML('beforeend', rowHtml(rowCount++)); };
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+  document.getElementById('mSave').onclick=async()=>{
+    const name=document.getElementById('rlName').value.trim(); if(!name) return;
+    const data={name, definedPrice:Number(document.getElementById('rlPrice').value)||0, packingCategory:document.getElementById('rlPackCat').value};
+    let releaseId = release.id;
+    if(isEdit) await updateDocIn('releases', release.id, data);
+    else { const ref = await addDocTo('releases', data); releaseId = ref.id; }
+    const rows = document.getElementById('rlRows') ? [...document.querySelectorAll('#rlRows [data-crow]')] : [];
+    let count=0;
+    for(const row of rows){
+      const oshiName = row.querySelector('.rlChar').value.trim();
+      if(!oshiName) continue;
+      const entryName = row.querySelector('.rlEntryName').value.trim();
+      const qty = Number(row.querySelector('.rlQty').value)||0;
+      await addDocTo('exchangeItems', {
+        releaseId, oshiName, name:entryName,
+        totalQty:qty, hasDamage:false, damageNote:'',
+        isWanted:false, wantedTarget:null, priority:false,
+        saleStatus:null, saleStatusDate:todayStr(),
+      });
+      count++;
+    }
+    showToast(count?`グッズと${count}件の絵柄を登録しました`:'保存しました'); closeModal();
+  };
+}
+function openItemModal(item){
+  const isEdit=!!item.id; const host=document.getElementById('modalHost');
+  const charOptions = allCharacterNameOptions();
+  const release = state.releases.find(r=>r.id===item.releaseId);
+  host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>${isEdit?'絵柄エントリを編集':'絵柄エントリを追加'}</h3>
+    <div class="hint" style="margin-bottom:8px;">グッズ：${escapeHtml(release?release.name:'（未設定）')}</div>
+    ${isEdit?`<div class="row" style="margin-bottom:10px;"><button class="btn btn-ghost btn-sm" id="iPinBtn">${item.pinned?'📌 ピン留め中（解除）':'📍 ピン留めする'}</button></div>`:''}
+    <div class="field-group"><label class="field">画像</label>
+      ${item.imageUrl?`<img src="${item.imageUrl}" style="width:100%; max-height:180px; object-fit:cover; border-radius:10px; margin-bottom:6px;">`:''}
+      <input type="file" id="iImageFile" accept="image/*">
+      <div id="iImageStatus" class="hint"></div>
+    </div>
+    <div class="field-group"><label class="field">キャラクター名（自由入力・自動でマスタに登録されます）</label><input type="text" id="iOshi" list="charList" value="${escapeHtml(item.oshiName||'')}"><datalist id="charList">${charOptions.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist></div>
+    <div class="field-group"><label class="field">絵柄名・バージョン（任意）</label><input type="text" id="iName" placeholder="例）通常絵柄／ホロ／SECRET" value="${escapeHtml(item.name||'')}"></div>
+    <div class="field-group"><label class="field">所持数（譲渡可能数）</label><input type="number" id="iTotal" value="${item.totalQty??0}"></div>
+    <div class="row" style="margin-bottom:6px;"><label class="toggle"><input type="checkbox" id="iHasDamage" ${item.hasDamage?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px;">キズ・汚れなど難あり</span></div>
+    <div class="field-group"><label class="field">難ありメモ（任意）</label><input type="text" id="iDamageNote" placeholder="例）角に小さな凹みあり" value="${escapeHtml(item.damageNote||'')}"></div>
+    <div class="row" style="margin-bottom:6px;"><label class="toggle"><input type="checkbox" id="iIsWanted" ${item.isWanted?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px; font-weight:700;">求めてる絵柄にする</span></div>
+    <div id="iWantFields" style="${item.isWanted?'':'display:none;'}">
+      <div class="row" style="margin-bottom:6px;"><label class="toggle"><input type="checkbox" id="iNoLimit" ${item.wantedTarget==null&&item.isWanted?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px;">上限なし（∞・とにかく欲しいだけ集める）</span></div>
+      <div class="field-group" id="iTargetGroup" style="${(item.wantedTarget==null&&item.isWanted)?'display:none;':''}"><label class="field">求める個数（上限）</label><input type="number" id="iTarget" value="${item.wantedTarget??1}"></div>
+      <div class="row" style="margin-bottom:10px;"><label class="toggle"><input type="checkbox" id="iPriority" ${item.priority?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px;">最優先</span></div>
+    </div>
+    <div class="field-group"><label class="field">売買ステータス</label>
+      <select id="iSaleStatus"><option value="" ${!item.saleStatus?'selected':''}>なし</option><option ${item.saleStatus==='出品中'?'selected':''}>出品中</option><option ${item.saleStatus==='売却済み'?'selected':''}>売却済み</option><option ${item.saleStatus==='発送済み'?'selected':''}>発送済み</option></select></div>
+    <div class="field-group"><label class="field">原価（未入力ならグッズの定価を使用）</label><input type="number" id="iCost" value="${item.costPrice??''}"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">キャンセル</button><button class="btn btn-primary" id="mSave">保存</button></div>
+  </div></div>`;
+  let pinnedState = !!item.pinned;
+  const pinBtn = document.getElementById('iPinBtn');
+  if(pinBtn) pinBtn.onclick=()=>{ pinnedState=!pinnedState; pinBtn.textContent = pinnedState?'📌 ピン留め中（解除）':'📍 ピン留めする'; };
+  document.getElementById('iIsWanted').addEventListener('change', (e)=>{ document.getElementById('iWantFields').style.display = e.target.checked?'block':'none'; });
+  document.getElementById('iNoLimit').addEventListener('change', (e)=>{ document.getElementById('iTargetGroup').style.display = e.target.checked?'none':'block'; });
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+  document.getElementById('mSave').onclick=async()=>{
+    const oshiName=document.getElementById('iOshi').value.trim(); if(!oshiName) return;
+    const isWanted = document.getElementById('iIsWanted').checked;
+    const noLimit = document.getElementById('iNoLimit').checked;
+    const newSaleStatus = document.getElementById('iSaleStatus').value;
+    if(!isEdit){
+      const dup = state.items.some(i=>i.releaseId===item.releaseId && i.oshiName===oshiName && i.name===document.getElementById('iName').value.trim());
+      if(dup){ if(!confirm('同じキャラ・絵柄の組み合わせが既に登録されています。それでも追加しますか？')) return; }
+    }
+    const data={
+      releaseId:item.releaseId||null,
+      oshiName, name:document.getElementById('iName').value.trim(),
+      totalQty:Number(document.getElementById('iTotal').value)||0,
+      hasDamage:document.getElementById('iHasDamage').checked,
+      damageNote:document.getElementById('iDamageNote').value,
+      isWanted,
+      wantedTarget: isWanted ? (noLimit ? null : Number(document.getElementById('iTarget').value)||1) : null,
+      priority: isWanted ? document.getElementById('iPriority').checked : false,
+      saleStatus:newSaleStatus||null,
+      costPrice:document.getElementById('iCost').value?Number(document.getElementById('iCost').value):null,
+      pinned:pinnedState,
+    };
+    if(!isEdit || item.saleStatus!==newSaleStatus) data.saleStatusDate = todayStr();
+    let savedId = item.id;
+    if(isEdit) await updateDocIn('exchangeItems', item.id, data); else { const ref = await addDocTo('exchangeItems', data); savedId = ref?.id; }
+    const fileInput = document.getElementById('iImageFile');
+    if(fileInput.files[0] && savedId){
+      document.getElementById('iImageStatus').textContent = '画像をアップロード中…';
+      try{
+        const url = await uploadItemImage(fileInput.files[0], savedId);
+        await updateDocIn('exchangeItems', savedId, {imageUrl:url});
+      }catch(e){ showToast('画像のアップロードに失敗しました'); }
+    }
+    showToast('保存しました'); closeModal();
+  };
+}
+function openBulkItemModal(releaseId){
+  const host=document.getElementById('modalHost');
+  const charOptions = allCharacterNameOptions();
+  const release = state.releases.find(r=>r.id===releaseId);
+  host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>キャラ複数を一括登録</h3>
+    <div class="hint" style="margin-bottom:8px;">グッズ：${escapeHtml(release?release.name:'（未設定）')}</div>
+    <label class="field">キャラ名・絵柄名・個数を行ごとに入力</label>
+    <div id="biRows"></div>
+    <button class="btn btn-ghost btn-sm" id="biAddRow" style="margin:6px 0 10px;">＋ 行を追加</button>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">キャンセル</button><button class="btn btn-primary" id="mSave">一括登録</button></div>
+  </div></div>`;
+  let rowCount=0;
+  function rowHtml(i){
+    return `<div class="row2" data-row="${i}" style="margin-bottom:6px;">
+      <input type="text" class="biChar" list="charList2" placeholder="キャラ名">
+      <div class="row" style="gap:4px;"><input type="text" class="biName" placeholder="絵柄名(任意)" style="width:100%;"><input type="number" class="biQty" value="1" min="0" style="width:60px;"></div>
+    </div>`;
+  }
+  document.getElementById('biRows').insertAdjacentHTML('beforeend', `<datalist id="charList2">${charOptions.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>`+rowHtml(rowCount++));
+  document.getElementById('biAddRow').onclick=()=>{ document.getElementById('biRows').insertAdjacentHTML('beforeend', rowHtml(rowCount++)); };
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+  document.getElementById('mSave').onclick=async()=>{
+    const rows=[...document.querySelectorAll('#biRows [data-row]')];
+    let count=0;
+    for(const row of rows){
+      const oshiName=row.querySelector('.biChar').value.trim();
+      if(!oshiName) continue;
+      const name=row.querySelector('.biName').value.trim();
+      const qty=Number(row.querySelector('.biQty').value)||0;
+      await addDocTo('exchangeItems', {
+        releaseId: releaseId||null, oshiName, name,
+        totalQty:qty, hasDamage:false, damageNote:'',
+        isWanted:false, wantedTarget:null, priority:false,
+        saleStatus:null, saleStatusDate:todayStr(),
+      });
+      count++;
+    }
+    showToast(`${count}件を一括登録しました`); closeModal();
+  };
+}
+
+/* ================================================================
+   ③ 売買管理
+   ================================================================ */
+function renderSaleTab(){
+  const soldItems = state.items.filter(i=>['売却済み','発送済み'].includes(i.saleStatus) && i.soldPrice);
+  const totalSold = soldItems.reduce((s,i)=>s+(i.soldPrice||0),0);
+  const totalProfit = soldItems.reduce((s,i)=>s+(i.profitAmount||0),0);
+  const monthly = {};
+  soldItems.forEach(i=>{ if(!i.soldDate) return; const m=i.soldDate.slice(0,7); monthly[m]=(monthly[m]||0)+(i.profitAmount||0); });
+  const months = Object.keys(monthly).sort();
+
+  const statusOptions = ['ALL','出品中','売却済み','発送済み'];
+  const filterBtns = `<div class="filter-select">${statusOptions.map(s=>`<button data-sstatus="${s}" class="${ui.saleFilterStatus===s?'active':''}">${s==='ALL'?'すべて':s}</button>`).join('')}</div>`;
+  const filtered = state.items.filter(i=>i.saleStatus).filter(i=>ui.saleFilterStatus==='ALL'||i.saleStatus===ui.saleFilterStatus);
+  const cards = filtered.length ? filtered.map(renderSaleItemCard).join('') : `<div class="empty">売買対象のグッズがありません（グッズ管理で売買ステータスを設定してください）</div>`;
+
+  return `
+    <div class="card">
+      <h2>売買サマリー</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="label">売却済み合計</div><div class="value">${yen(totalSold)}</div></div>
+        <div class="stat-box"><div class="label">合計利益</div><div class="value">${yen(totalProfit)}</div></div>
+      </div>
+      ${months.length ? renderLineChart(months, months.map(m=>monthly[m])) : `<div class="hint">売却実績がまだありません</div>`}
+      <button class="btn btn-ghost btn-block" id="exportSaleCsvBtn" style="margin-top:10px;">📄 売買記録をCSVで書き出す</button>
+    </div>
+    <div class="card">
+      <h2>逆算ツール <span class="badge">出品先比較</span></h2>
+      <button class="btn btn-primary btn-block" id="openReverseCalcBtn">原価から必要な出品価格を計算する</button>
+      <div class="hint">原価＋送料＋希望利益から、プラットフォームごとの必要出品価格を比較表示します</div>
+    </div>
+    <div class="card">
+      <h2>売買グッズ一覧 <span class="badge">${filtered.length}件</span></h2>
+      ${filterBtns}${cards}
+    </div>`;
+}
+function renderSaleItemCard(it){
+  const salePill = {'出品中':'blue','売却済み':'green','発送済み':'gray'}[it.saleStatus]||'gray';
+  let reminder='';
+  if(it.saleStatus==='出品中' && daysSince(it.saleStatusDate) >= LISTING_REMINDER_DAYS){
+    reminder = `<div class="reminder-badge">⏰ 出品から${daysSince(it.saleStatusDate)}日経過</div>`;
+  }
+  return `<div class="item-card" data-item-id="${it.id}">
+    <div class="top"><div><div class="name">${escapeHtml(it.name)}</div><div class="tags"><span class="tag">${escapeHtml(it.oshiName||'')}</span></div></div>
+      <div class="actions">${it.saleStatus==='出品中'?`<button class="btn btn-sm btn-primary" data-act="mark-sold" data-id="${it.id}">売却済みにする</button>`:''}</div>
+    </div>
+    <div class="status-row"><span class="status-pill ${salePill}">${escapeHtml(it.saleStatus)}</span>${it.costPrice?`<span class="tag">原価${yen(it.costPrice)}</span>`:''}${it.soldPrice?`<span class="tag">売却${yen(it.soldPrice)}</span>`:''}${it.profitAmount!=null?`<span class="tag">利益${yen(it.profitAmount)}</span>`:''}</div>
+    ${reminder}
+  </div>`;
+}
+function renderLineChart(labels, values){
+  const w=560,h=140,pad=30;
+  const max=Math.max(...values,1), min=Math.min(...values,0);
+  const range=(max-min)||1;
+  const stepX = labels.length>1 ? (w-pad*2)/(labels.length-1) : 0;
+  const pts = values.map((v,i)=>{
+    const x = pad + stepX*i;
+    const y = h-pad - ((v-min)/range)*(h-pad*2);
+    return [x,y];
+  });
+  const pathD = pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const dots = pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="var(--accent)"></circle>`).join('');
+  const labelsSvg = labels.map((l,i)=>`<text x="${pts[i][0].toFixed(1)}" y="${h-8}" font-size="9" fill="var(--sub)" text-anchor="middle">${l.slice(5)}</text>`).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:140px;">
+    <path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+    ${dots}${labelsSvg}
+  </svg>`;
+}
+function downloadCsv(filename, rows){
+  const csv = rows.map(row=>row.map(v=>{
+    const s = String(v??'');
+    return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  }).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function bindSaleEvents(){
+  document.querySelectorAll('.filter-select button[data-sstatus]').forEach(b=>b.onclick=()=>{ ui.saleFilterStatus=b.dataset.sstatus; render(); });
+  document.querySelectorAll('[data-act="mark-sold"]').forEach(b=>b.onclick=()=>openMarkSoldModal(state.items.find(i=>i.id===b.dataset.id)));
+  const rc=document.getElementById('openReverseCalcBtn'); if(rc) rc.onclick=openReverseCalcModal;
+  const csvBtn=document.getElementById('exportSaleCsvBtn');
+  if(csvBtn) csvBtn.onclick=()=>{
+    const soldItems = state.items.filter(i=>['売却済み','発送済み'].includes(i.saleStatus) && i.soldPrice);
+    const rows = [['グッズ名','推し','売却日','出品先','販売価格','送料実費','原価','利益']];
+    soldItems.forEach(i=>{
+      const platform = state.platforms.find(p=>p.id===i.soldPlatformId);
+      rows.push([i.name, i.oshiName||'', i.soldDate||'', platform?platform.name:'', i.soldPrice||0, i.shippingCostActual||0, i.costPrice||0, i.profitAmount||0]);
+    });
+    downloadCsv(`売買記録_${todayStr()}.csv`, rows);
+  };
+}
+function openMarkSoldModal(item){
+  const host=document.getElementById('modalHost');
+  const release = state.releases.find(r=>r.id===item.releaseId);
+  const effectiveCost = item.costPrice!=null ? item.costPrice : (release?release.definedPrice:0);
+  const marketplaceShip = state.shippingMethods.filter(s=>s.visible && ['メルカリ','ヤフーフリマ','ラクマ'].includes(s.platformGroup));
+  host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>売却情報を入力</h3>
+    <div class="field-group"><label class="field">出品先</label><select id="msPlatform"><option value="">選択なし</option>${state.platforms.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}（手数料${p.feeRate}%）</option>`).join('')}</select></div>
+    <div class="field-group"><label class="field">発送方法</label><select id="msShipMethod"><option value="">未定</option>${marketplaceShip.map(s=>`<option value="${s.id}">${escapeHtml(s.platformGroup)} / ${escapeHtml(s.name)}（${s.price>=0?yen(s.price):'料金別途'}）</option>`).join('')}</select></div>
+    <div class="row2">
+      <div class="field-group"><label class="field">販売価格</label><input type="number" id="msPrice" value=""></div>
+      <div class="field-group"><label class="field">送料（実費・任意）</label><input type="number" id="msShip" value="0"></div>
+    </div>
+    <div class="field-group"><label class="field">売却日</label><input type="date" id="msDate" value="${todayStr()}"></div>
+    <div class="hint">原価：${yen(effectiveCost)}${item.costPrice==null?'（グッズの定価を使用）':''}</div>
+    <div id="msResult" class="copybox" style="display:none;"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">キャンセル</button><button class="btn btn-primary" id="mSave">保存</button></div>
+  </div></div>`;
+  function recalc(){
+    const platform = state.platforms.find(p=>p.id===document.getElementById('msPlatform').value);
+    const shipMethod = state.shippingMethods.find(s=>s.id===document.getElementById('msShipMethod').value);
+    const price = Number(document.getElementById('msPrice').value)||0;
+    let ship = Number(document.getElementById('msShip').value)||0;
+    if(shipMethod && shipMethod.price>=0 && !document.getElementById('msShip').dataset.touched) { ship = shipMethod.price; document.getElementById('msShip').value = ship; }
+    const feeRate = platform ? platform.feeRate : 0;
+    const fee = Math.round(price*feeRate/100);
+    const proceeds = price - fee;
+    const profit = proceeds - ship - effectiveCost;
+    const box=document.getElementById('msResult');
+    box.style.display='block';
+    box.textContent = `手数料(${feeRate}%): -${fee}円\n入金額: ${proceeds}円\n送料差引後: ${proceeds-ship}円\n原価差引後の利益: ${profit}円`;
+  }
+  document.getElementById('msShip').addEventListener('input', (e)=>{ e.target.dataset.touched='1'; });
+  ['msPlatform','msShipMethod','msPrice','msShip'].forEach(id=>document.getElementById(id).addEventListener('input', recalc));
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+  document.getElementById('mSave').onclick=async()=>{
+    const platform = state.platforms.find(p=>p.id===document.getElementById('msPlatform').value);
+    const price = Number(document.getElementById('msPrice').value)||0;
+    const ship = Number(document.getElementById('msShip').value)||0;
+    const feeRate = platform ? platform.feeRate : 0;
+    const fee = Math.round(price*feeRate/100);
+    const profit = price - fee - ship - effectiveCost;
+    await updateDocIn('exchangeItems', item.id, {
+      saleStatus:'売却済み', saleStatusDate:todayStr(),
+      soldPrice:price, soldPlatformId:platform?platform.id:null, shippingCostActual:ship,
+      soldShippingMethodId:document.getElementById('msShipMethod').value||null,
+      soldDate:document.getElementById('msDate').value, profitAmount:profit,
+    });
+    showToast('売却情報を保存しました'); closeModal();
+  };
+}
+function openReverseCalcModal(){
+  const host=document.getElementById('modalHost');
+  let selectedPlatformId = state.platforms[0]?.id || null;
+  host.innerHTML=`<div class="modal-overlay center" id="ov"><div class="modal"><h3>必要な出品価格を逆算</h3>
+    <label class="field">出品先を選択</label>
+    <div class="plat-select" id="rcPlatSelect">${state.platforms.map(p=>`<button data-plat="${p.id}" class="${p.id===selectedPlatformId?'active':''}">${escapeHtml(p.name)}</button>`).join('') || '<span class="hint">マスタで出品先を登録してください</span>'}</div>
+    <div class="row2">
+      <div class="field-group"><label class="field">商品代金（原価・円）</label><input type="number" id="rcCost" value="0"></div>
+      <div class="field-group"><label class="field">送料（円）</label><input type="number" id="rcShip" value="0"></div>
+    </div>
+    <div class="field-group"><label class="field">希望利益（円・任意）</label><input type="number" id="rcProfit" value="0"></div>
+    <div id="rcReceipt"></div>
+    <div class="modal-actions"><button class="btn btn-ghost btn-block" id="mCancel">閉じる</button></div>
+  </div></div>`;
+  function recalc(){
+    const cost=Number(document.getElementById('rcCost').value)||0;
+    const ship=Number(document.getElementById('rcShip').value)||0;
+    const profit=Number(document.getElementById('rcProfit').value)||0;
+    const platform = state.platforms.find(p=>p.id===selectedPlatformId);
+    const box = document.getElementById('rcReceipt');
+    if(!platform){ box.innerHTML = '<div class="hint">出品先を選択してください</div>'; return; }
+    const target = cost+ship+profit;
+    const price = Math.ceil(target / (1-platform.feeRate/100));
+    const fee = price - target;
+    box.innerHTML = `
+      <div class="receipt">
+        <div class="r-row"><span>商品代金</span><span>${yen(cost)}</span></div>
+        <div class="r-row"><span>＋ 送料</span><span>${yen(ship)}</span></div>
+        ${profit?`<div class="r-row"><span>＋ 希望利益</span><span>${yen(profit)}</span></div>`:''}
+        <div class="r-row"><span>＋ 手数料（${platform.feeRate}%）</span><span>${yen(fee)}</span></div>
+        <div class="r-line"></div>
+        <div class="r-total"><span>${escapeHtml(platform.name)}で出品する価格</span><span>${yen(price)}</span></div>
+        <div class="r-note">※手数料は出品価格に対してかかるため逆算した概算値です</div>
+      </div>`;
+  }
+  ['rcCost','rcShip','rcProfit'].forEach(id=>document.getElementById(id).addEventListener('input', recalc));
+  document.querySelectorAll('#rcPlatSelect button').forEach(b=>b.onclick=()=>{
+    selectedPlatformId=b.dataset.plat;
+    document.querySelectorAll('#rcPlatSelect button').forEach(x=>x.classList.toggle('active', x===b));
+    recalc();
+  });
+  recalc();
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+}
+
+/* ================================================================
+   ⑤ 交換記録
+   ================================================================ */
+const EXCHANGE_STATUS_STEPS = ['フォロー待ち','DM待ち','送付先待ち','交渉中','発送待ち','発送済み','受取確認待ち','完了'];
+const DEAL_TYPES = ['交換','譲渡','買取'];
+function formatDateJp(dateStr){
+  if(!dateStr) return '未定';
+  const d = new Date(dateStr+'T00:00:00');
+  const w = ['日','月','火','水','木','金','土'][d.getDay()];
+  return `${d.getMonth()+1}/${d.getDate()}(${w})`;
+}
+function generateFirstDmText(outItems, scheduledDate){
+  const releaseNames = [...new Set(outItems.map(i=>{ const r=state.releases.find(x=>x.id===i.releaseId); return r?r.name:null; }).filter(Boolean))];
+  const dealSection = (releaseNames.length? releaseNames.join('、')+'\n' : '') + outItems.map(i=>`・${i.oshiName}${i.name?'『'+i.name+'』':''}`).join('\n');
+  const visibleShip = state.shippingMethods.filter(s=>s.visible && (s.platformGroup||'個人')==='個人');
+  const shipSection = visibleShip.length ? visibleShip.map(s=>`・${s.name}`).join('\n') : '・（マスタで発送方法を表示ONにしてください）';
+  const packSection = outItems.map(i=>{
+    const release = state.releases.find(r=>r.id===i.releaseId);
+    const pack = release && release.packingCategory ? state.packingMethods.find(p=>p.category===release.packingCategory && p.visible!==false) : null;
+    return `${i.oshiName}${i.name?'『'+i.name+'』':''}\n${pack&&pack.procedureText ? pack.procedureText : '（梱包手順未設定）'}`;
+  }).join('\n\n');
+  return `この度はお声がけいただき、誠にありがとうございます。
+短い間ではございますが、お取引終了までどうぞよろしくお願いいたします。
+
+事前にご確認いただいた内容に基づき、改めて詳細をまとめました。
+お手隙の際にご確認いただけますと幸いです。
+
+◆お取引内容
+${dealSection || '（渡すグッズを選択してください）'}
+
+◆発送方法
+${shipSection}
+上記いずれかのうち、送料相互負担にてお互い同じ方法でお願いしたく存じます。
+
+◆梱包方法
+${packSection || '（渡すグッズを選択してください）'}
+
+◆発送予定日
+最短で${formatDateJp(scheduledDate)}にゆうゆう窓口より発送可能です。
+
+上記内容に相違ございませんでしたら、お手数ですが折り返し下記4点についてご連絡をお願いいたします。
+ 1. 交換品のお写真提示
+ 2. ご希望の発送方法
+ 3. 発送予定日
+ 4. お届け先（郵便番号・住所・氏名）
+
+こちらの送付先は、添付画像の内容にてお願いいたします。
+その他、ご不明な点やご要望がございましたらお気軽にお尋ねください。
+よろしくお願い申し上げます。`;
+}
+function exchangeReminder(r){
+  if(!r.scheduledDate || ['発送済み','受取確認待ち','完了'].includes(r.status)) return '';
+  const sd = new Date(r.scheduledDate+'T00:00:00'); const td = new Date(todayStr()+'T00:00:00');
+  const diff = Math.round((sd-td)/86400000);
+  if(diff===0) return '🚚 本日発送予定です！発送忘れていませんか？';
+  if(diff===1) return '📅 明日発送予定です（前日確認）';
+  if(diff<0) return `⚠️ 発送予定日を${Math.abs(diff)}日過ぎています`;
+  return '';
+}
+function renderExchangeTab(){
+  const active = state.exchangeRecords.filter(r=>r.status!=='完了');
+  const thisMonth = todayStr().slice(0,7);
+  const monthCount = state.exchangeRecords.filter(r=>(r.date||'').slice(0,7)===thisMonth).length;
+  const list = active.length ? active.map(renderExchangeCard).join('') : `<div class="empty">進行中の交換記録がありません</div>`;
+  return `<div class="card"><h2>交換記録 <span class="badge">${active.length}件 進行中</span> <span class="badge good">今月${monthCount}件</span></h2>${list}
+    <button class="btn btn-primary btn-block" id="addExBtn" style="margin-top:8px;">＋ 交換記録を追加</button></div>`;
+}
+function renderExchangeCard(r){
+  const statusPill = {'フォロー待ち':'gray','DM待ち':'gray','送付先待ち':'gray','交渉中':'orange','発送待ち':'orange','発送済み':'blue','受取確認待ち':'blue','完了':'green'}[r.status]||'gray';
+  const reminder = exchangeReminder(r);
+  const mySentPill = r.mySent ? 'green' : 'gray';
+  const theirSentPill = r.theirSent ? 'green' : 'gray';
+  const outTxt = (r.outItemsLinked||[]).map(o=>{ const it=state.items.find(i=>i.id===o.itemId); return it?`${it.oshiName}${it.name?'『'+it.name+'』':''}×${o.qty}`:''; }).filter(Boolean).join('、') || '-';
+  const inTxt = (r.inItemsLinked||[]).map(i=>`${i.oshiName}${i.name?'『'+i.name+'』':''}×${i.qty}`).join('、') || '-';
+  const paymentPill = r.paymentReceived ? 'green' : 'orange';
+  return `<div class="item-card" data-ex-id="${r.id}">
+    <div class="top"><div><div class="name">${escapeHtml(partnerLabel(r))}</div>
+      <div class="sub-meta">${escapeHtml(r.date||'')}${r.dealType?'・'+escapeHtml(r.dealType):''}${r.deliveryMethod?'・'+escapeHtml(r.deliveryMethod):''}${r.scheduledDate?`・予定日${escapeHtml(r.scheduledDate)}`:''}${r.sameDayWish?'・同日発送希望':''}</div></div>
+      <div class="actions"><button class="iconsm" data-act="edit-ex" data-id="${r.id}">✏️</button><button class="iconsm" data-act="del-ex" data-id="${r.id}">🗑️</button></div>
+    </div>
+    <div class="tags"><span class="tag">渡す：${escapeHtml(outTxt)}</span><span class="tag">もらう：${escapeHtml(inTxt)}</span></div>
+    ${r.settlementNeeded?`<div class="tags"><span class="tag">精算：${yen(r.shortfallAmount)}</span></div>`:''}
+    <div class="status-row">
+      <span class="status-pill ${statusPill}">${escapeHtml(r.status||'交渉中')}</span>
+      <span class="status-pill ${mySentPill}">自分：${r.mySent?'発送済み'+(r.mySentDate?`(${escapeHtml(r.mySentDate)})`:''):'未発送'}</span>
+      <span class="status-pill ${theirSentPill}">相手：${r.theirSent?'発送済み'+(r.theirSentDate?`(${escapeHtml(r.theirSentDate)})`:''):'未発送'}</span>
+      ${r.settlementNeeded?`<span class="status-pill ${paymentPill}">入金：${r.paymentReceived?'確認済み'+(r.paymentDate?`(${escapeHtml(r.paymentDate)})`:''):'未確認'}</span>`:''}
+    </div>
+    ${(r.myTracking||r.theirTracking)?`<div class="tags">${r.myTracking?`<span class="tag">自分の追跡番号：${escapeHtml(r.myTracking)}</span>`:''}${r.theirTracking?`<span class="tag">相手の追跡番号：${escapeHtml(r.theirTracking)}</span>`:''}</div>`:''}
+    ${reminder?`<div class="reminder-badge">${reminder}</div>`:''}
+  </div>`;
+}
+function bindExchangeEvents(){
+  const addBtn=document.getElementById('addExBtn'); if(addBtn) addBtn.onclick=()=>openExchangeModal({});
+  document.querySelectorAll('[data-act="edit-ex"]').forEach(b=>b.onclick=()=>openExchangeModal(state.exchangeRecords.find(r=>r.id===b.dataset.id)));
+  document.querySelectorAll('[data-act="del-ex"]').forEach(b=>b.onclick=async()=>{ if(confirm('削除しますか？')){ await deleteDocIn('exchangeRecords', b.dataset.id); showToast('削除しました'); } });
+}
+/* 交換完了時：渡したグッズの在庫を減らし、もらったグッズを在庫に自動登録・希望リストの決定数を加算 */
+/* グッズ帳（推し活グッズ帳）のcharactersコレクションから推し名で検索、なければ新規作成 */
+async function findOrCreateGoodsCharacter(oshiName){
+  if(!oshiName) return null;
+  const snap = await getDocs(query(collection(db,'users',uid,'characters')));
+  const found = snap.docs.find(d=>(d.data().name||'')===oshiName);
+  if(found) return found.id;
+  const ref = await addDoc(collection(db,'users',uid,'characters'), {
+    name: oshiName, color:'#FF6FA5', image:null, shopUrl:'', order: snap.size, createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+/* imageUrlは既にFirestore保存用のdata URL（base64）なので、そのまま使う。念のためBlob URL等が来た場合のみ変換する */
+async function urlToBase64(url){
+  if(url && url.startsWith('data:')) return url;
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+async function applyExchangeCompletion(record){
+  for(const o of (record.outItemsLinked||[])){
+    const it = state.items.find(i=>i.id===o.itemId);
+    if(!it) continue;
+    const newTotal = Math.max(0, (it.totalQty||0) - (Number(o.qty)||0));
+    await updateDocIn('exchangeItems', it.id, { totalQty:newTotal });
+  }
+  for(const inp of (record.inItemsLinked||[])){
+    let newItemId, releaseId = inp.releaseId||null, category='';
+    const release = state.releases.find(r=>r.id===releaseId);
+    if(release) category = release.packingCategory||'';
+
+    if(inp.linkedItemId){
+      // 既存の「求めてる絵柄」エントリの所持数を加算
+      const w = state.items.find(x=>x.id===inp.linkedItemId);
+      if(w){
+        await updateDocIn('exchangeItems', w.id, { totalQty: (w.totalQty||0) + (Number(inp.qty)||0) });
+        newItemId = w.id;
+        releaseId = w.releaseId||releaseId;
+      }
+    } else {
+      const newRef = await addDocTo('exchangeItems', {
+        releaseId, oshiName: inp.oshiName||'', name: inp.name||'',
+        totalQty: Number(inp.qty)||1, hasDamage:false, damageNote:'',
+        imageUrl: inp.imageUrl||null,
+        isWanted:false, wantedTarget:null, priority:false,
+        saleStatus:null, saleStatusDate:todayStr(),
+      });
+      newItemId = newRef?.id;
+    }
+
+    // 推し活グッズ帳への自動連携
+    try{
+      const goodsCharId = await findOrCreateGoodsCharacter(inp.oshiName);
+      if(goodsCharId){
+        let images = [];
+        if(inp.imageUrl){
+          try{ const b64 = await urlToBase64(inp.imageUrl); images = [b64]; }catch(e){ /* 画像変換失敗時は画像なしで登録 */ }
+        }
+        const goodsRef = await addDoc(collection(db,'users',uid,'items'), {
+          characterId: goodsCharId, name: inp.name||'', series: release?release.name:'', category,
+          price:0, qty:Number(inp.qty)||1, date:todayStr(), memo:'交換アプリで入手',
+          eventName:'', location:'', status:'unopened', images, image: images[0]||null,
+          createdAt: serverTimestamp(),
+        });
+        if(newItemId) await updateDocIn('exchangeItems', newItemId, {linkedGoodsId: goodsRef.id});
+      }
+    }catch(e){ console.error('グッズ帳への連携に失敗しました', e); showToast('グッズ帳への自動登録に失敗しました（在庫への反映は完了しています）'); }
+  }
+}
+function openExchangeModal(item){
+  const isEdit=!!item.id; const host=document.getElementById('modalHost');
+  const visibleShip = state.shippingMethods.filter(s=>s.visible && (s.platformGroup||'個人')==='個人');
+  let outRows = (item.outItemsLinked||[{itemId:'',qty:1}]).map(o=>({...o}));
+  let inRows = (item.inItemsLinked||[{oshiName:'',name:'',qty:1,linkedItemId:'',releaseId:''}]).map(i=>({...i}));
+
+  function outRowHtml(o,i){
+    return `<div class="row2" data-outrow="${i}" style="margin-bottom:6px;">
+      <select class="exOutItem">
+        <option value="">グッズを選択</option>
+        ${state.items.filter(it=>!it.isWanted && (it.totalQty||0)>0).map(it=>`<option value="${it.id}" ${o.itemId===it.id?'selected':''}>${escapeHtml(it.oshiName)}${it.name?'『'+escapeHtml(it.name)+'』':''}（交換可${it.totalQty||0}）</option>`).join('')}
+      </select>
+      <input type="number" class="exOutQty" value="${o.qty||1}" min="1">
+    </div>`;
+  }
+  function inRowHtml(i2,idx){
+    return `<div data-inrow="${idx}" style="border:1px solid var(--border); border-radius:10px; padding:8px; margin-bottom:6px;">
+      <div class="row2" style="margin-bottom:6px;">
+        <select class="exInLinked"><option value="">新規（求リストと紐付けない）</option>${state.items.filter(it=>it.isWanted).map(w=>`<option value="${w.id}" ${i2.linkedItemId===w.id?'selected':''}>${escapeHtml(w.oshiName)}${w.name?'『'+escapeHtml(w.name)+'』':''}（求めてる絵柄）</option>`).join('')}</select>
+        <input type="number" class="exInQty" value="${i2.qty||1}" min="1">
+      </div>
+      <div class="row2" style="margin-bottom:6px;">
+        <input type="text" class="exInOshi" list="charListEx" placeholder="キャラ名" value="${escapeHtml(i2.oshiName||'')}">
+        <input type="text" class="exInName" placeholder="絵柄名(任意)" value="${escapeHtml(i2.name||'')}">
+      </div>
+      <div class="row2">
+        <select class="exInRelease"><option value="">グッズ未設定</option>${state.releases.map(r=>`<option value="${r.id}" ${i2.releaseId===r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}</select>
+        <input type="file" class="exInImage" accept="image/*">
+      </div>
+    </div>`;
+  }
+
+  const recentDm = [...state.dmHistory].sort((a,b)=>(b.createdAtStr||'').localeCompare(a.createdAtStr||'')).slice(0,10);
+
+  const partnerOpts = allPartnerNameOptions();
+  host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>${isEdit?'交換記録を編集':'交換記録を追加'}</h3>
+    <datalist id="charListEx">${allCharacterNameOptions().map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
+    <datalist id="userNameListEx">${partnerOpts.names.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
+    <datalist id="accountNameListEx">${partnerOpts.accounts.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
+    <div class="field-group"><label class="field">取引タイプ</label>
+      <select id="exDealType">${DEAL_TYPES.map(t=>`<option value="${t}" ${item.dealType===t?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="row2">
+      <div class="field-group"><label class="field">ユーザー名</label><input type="text" id="exPartnerUser" list="userNameListEx" placeholder="例）うさぎ様" value="${escapeHtml(item.partnerUserName||'')}"></div>
+      <div class="field-group"><label class="field">アカウント名（SNS ID等）</label><input type="text" id="exPartnerAccount" list="accountNameListEx" placeholder="例）@usagi_xxx" value="${escapeHtml(item.partnerAccountName||'')}"></div>
+    </div>
+    <div id="exPartnerHint" class="hint" style="display:none;"></div>
+    <div class="field-group"><label class="field">交換日</label><input type="date" id="exDate" value="${item.date||todayStr()}"></div>
+
+    <label class="field">渡すグッズ（グッズ管理から選択）</label>
+    <div id="exOutRows">${outRows.map(outRowHtml).join('')}</div>
+    <button class="btn btn-ghost btn-sm" id="exAddOutRow" style="margin-bottom:10px;">＋ 行を追加</button>
+
+    <label class="field">もらうグッズ（完了時に自動でグッズ管理へ反映）</label>
+    <div id="exInRows">${inRows.map(inRowHtml).join('')}</div>
+    <button class="btn btn-ghost btn-sm" id="exAddInRow" style="margin-bottom:10px;">＋ 行を追加</button>
+
+    <div class="card" style="background:var(--surface2); border:1px solid var(--border); padding:12px; margin:0 0 12px;">
+      <div class="row" style="margin-bottom:8px;"><label class="toggle"><input type="checkbox" id="exSettlementNeeded" ${item.settlementNeeded?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px; font-weight:700;">精算あり（差額のやり取り・買取金額など）</span></div>
+      <div id="exSettlementFields" style="${item.settlementNeeded?'':'display:none;'}">
+        <label class="field">精算金額（円）</label><input type="number" id="exShortfall" value="${item.shortfallAmount??0}">
+        <div class="row" style="margin:8px 0 6px;"><label class="toggle"><input type="checkbox" id="exPaymentReceived" ${item.paymentReceived?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px; font-weight:700;">入金確認済み</span></div>
+        <label class="field">入金日（任意）</label><input type="date" id="exPaymentDate" value="${item.paymentDate||''}">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field-group"><label class="field">発送方法</label><select id="exDelivery"><option value="手渡し" ${item.deliveryMethod==='手渡し'?'selected':''}>手渡し</option><option value="郵送" ${item.deliveryMethod==='郵送'?'selected':''}>郵送</option></select></div>
+      <div class="field-group"><label class="field">予定日</label><input type="date" id="exScheduled" value="${item.scheduledDate||''}"></div>
+    </div>
+    <div class="row" style="margin-bottom:10px;"><label class="toggle"><input type="checkbox" id="exSameDay" ${item.sameDayWish?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px;">相手と同日発送を希望</span></div>
+    <div class="row2">
+      <div class="field-group"><label class="field">発送手段プリセット</label><select id="exShip"><option value="">未定</option></select></div>
+      <div class="field-group"><label class="field">梱包方法</label><select id="exPack"><option value="">未定</option>${state.packingMethods.map(p=>`<option value="${p.id}" ${item.packingMethodId===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select></div>
+    </div>
+    <div id="exShipEstimate" class="hint" style="margin-top:-6px; margin-bottom:8px;"></div>
+    <div id="exShipWarning"></div>
+    <div class="field-group"><label class="field">ステータス</label><select id="exStatus">${EXCHANGE_STATUS_STEPS.map(s=>`<option ${item.status===s?'selected':''}>${s}</option>`).join('')}</select>
+      ${item.status==='完了'&&item.stockApplied?'<div class="hint">✅ 在庫反映済みです</div>':'<div class="hint">「完了」で保存すると自動で在庫に反映されます（初回のみ）</div>'}</div>
+
+    <div class="card" style="background:var(--surface2); border:1px solid var(--border); padding:12px; margin:0 0 12px;">
+      <div style="font-size:12px; font-weight:800; margin-bottom:8px;">発送状況（自分／相手）</div>
+      <div class="row2">
+        <div>
+          <div class="row" style="margin-bottom:6px;"><label class="toggle"><input type="checkbox" id="exMySent" ${item.mySent?'checked':''}><span class="slider"></span></label><span style="font-size:12px;">自分：発送済み</span></div>
+          <label class="field">発送日</label><input type="date" id="exMySentDate" value="${item.mySentDate||''}">
+          <label class="field" style="margin-top:6px;">追跡番号</label><input type="text" id="exMyTracking" value="${escapeHtml(item.myTracking||'')}">
+        </div>
+        <div>
+          <div class="row" style="margin-bottom:6px;"><label class="toggle"><input type="checkbox" id="exTheirSent" ${item.theirSent?'checked':''}><span class="slider"></span></label><span style="font-size:12px;">相手：発送済み</span></div>
+          <label class="field">発送日</label><input type="date" id="exTheirSentDate" value="${item.theirSentDate||''}">
+          <label class="field" style="margin-top:6px;">追跡番号</label><input type="text" id="exTheirTracking" value="${escapeHtml(item.theirTracking||'')}">
+        </div>
+      </div>
+      <div class="hint">両方「発送済み」になったらステータスを「受取確認待ち」に更新するのを忘れずに</div>
+    </div>
+    <button class="btn btn-primary btn-block" id="genFirstDmBtn" style="margin-bottom:10px;">📋 初回DM文面を自動生成する</button>
+    <div class="field-group"><label class="field">DMテンプレート（ワンタップで挿入）</label>
+      <div class="chip-select" id="exDmQuickButtons">${state.dmTemplates.map(t=>`<label style="cursor:pointer;" data-quickdm="${t.id}"><input type="radio" name="exDmQuick" style="display:none;">${escapeHtml(t.scene)}：${escapeHtml(t.name)}</label>`).join('') || '<span class="hint">マスタでDMテンプレを登録してください</span>'}</div>
+      <select id="exDmSelect" style="display:none;"><option value="">選択して挿入</option>${state.dmTemplates.map(t=>`<option value="${t.id}">${escapeHtml(t.scene)} / ${escapeHtml(t.name)}</option>`).join('')}</select></div>
+    ${recentDm.length?`<div class="field-group"><label class="field">過去の下書きから呼び出す</label><select id="exDmHistorySelect"><option value="">選択してください</option>${recentDm.map(h=>`<option value="${h.id}">${escapeHtml((h.text||'').slice(0,20))}…</option>`).join('')}</select></div>`:''}
+    <textarea id="exCopyBox" style="display:none; min-height:220px;"></textarea>
+    <button class="btn btn-ghost btn-block" id="exCopyBtn" style="display:none; margin-top:6px;">コピーする</button>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">キャンセル</button><button class="btn btn-primary" id="mSave">保存</button></div>
+  </div></div>`;
+
+  function bindRowEvents(){
+    document.getElementById('exAddOutRow').onclick=()=>{ outRows.push({itemId:'',qty:1}); document.getElementById('exOutRows').insertAdjacentHTML('beforeend', outRowHtml({itemId:'',qty:1}, outRows.length-1)); };
+    document.getElementById('exAddInRow').onclick=()=>{ inRows.push({oshiName:'',name:'',qty:1,linkedItemId:'',releaseId:''}); document.getElementById('exInRows').insertAdjacentHTML('beforeend', inRowHtml({oshiName:'',name:'',qty:1,linkedItemId:'',releaseId:''}, inRows.length-1)); };
+  }
+  bindRowEvents();
+
+  function estimateOutSize(){
+    const rows = [...document.querySelectorAll('#exOutRows [data-outrow]')];
+    let thicknessMm=0, weightG=0; const usedNames=[]; const baseAdded=new Set();
+    rows.forEach(row=>{
+      const itemId = row.querySelector('.exOutItem').value;
+      const qty = Number(row.querySelector('.exOutQty').value)||0;
+      if(!itemId) return;
+      const it = state.items.find(x=>x.id===itemId);
+      if(!it) return;
+      const release = state.releases.find(r=>r.id===it.releaseId);
+      let pm = null;
+      if(release && release.packingCategory){
+        pm = state.packingMethods.find(p=>p.category===release.packingCategory && p.visible!==false) || state.packingMethods.find(p=>p.category===release.packingCategory);
+      }
+      if(pm){
+        if(!baseAdded.has(pm.id)){ thicknessMm += (pm.baseThicknessMm||0); weightG += (pm.baseWeightG||0); baseAdded.add(pm.id); }
+        thicknessMm += (pm.unitThicknessMm||0)*qty; weightG += (pm.unitWeightG||0)*qty; usedNames.push(pm.name);
+      }
+    });
+    return {thicknessMm:Math.round(thicknessMm*10)/10, weightG:Math.round(weightG), usedNames};
+  }
+  function refreshShipRecommendation(){
+    const est = estimateOutSize();
+    const estBox = document.getElementById('exShipEstimate');
+    estBox.textContent = (est.thicknessMm>0||est.weightG>0) ? `📦 推定サイズ：厚み約${est.thicknessMm}mm・重さ約${est.weightG}g（${[...new Set(est.usedNames)].join('、')}を基に算出）` : '梱包カテゴリー未設定のグッズは推定に含まれません';
+    const shipSel = document.getElementById('exShip');
+    const prevValue = shipSel.value;
+    const recommended = (est.thicknessMm>0||est.weightG>0) ? recommendShippingMethods(est.thicknessMm/10, est.weightG/1000).filter(s=>s.visible && (s.platformGroup||'個人')==='個人') : [];
+    const recIds = new Set(recommended.slice(0,5).map(s=>s.id));
+    const others = visibleShip.filter(s=>!recIds.has(s.id));
+    let html = '<option value="">未定</option>';
+    if(recommended.length){
+      html += `<optgroup label="🔍 このグッズにおすすめ">${recommended.slice(0,5).map(s=>`<option value="${s.id}">${escapeHtml(s.name)}（${s.price>=0?yen(s.price):'料金別途'}）</option>`).join('')}</optgroup>`;
+    }
+    html += `<optgroup label="その他の発送方法">${others.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}</optgroup>`;
+    shipSel.innerHTML = html;
+    shipSel.value = (prevValue && [...shipSel.options].some(o=>o.value===prevValue)) ? prevValue : (item.shippingMethodId && [...shipSel.options].some(o=>o.value===item.shippingMethodId) ? item.shippingMethodId : '');
+    validateShipSelection();
+  }
+  function validateShipSelection(){
+    const shipSel = document.getElementById('exShip');
+    const warnBox = document.getElementById('exShipWarning');
+    const s = state.shippingMethods.find(x=>x.id===shipSel.value);
+    if(!s){ warnBox.innerHTML=''; return; }
+    const est = estimateOutSize();
+    const thicknessCm = est.thicknessMm/10, weightKg = est.weightG/1000;
+    const overThick = s.thickness!=null && thicknessCm>s.thickness;
+    const overWeight = s.weight!=null && weightKg>s.weight;
+    if(overThick || overWeight){
+      warnBox.innerHTML = `<div style="background:#FFE1E1; border:1px solid var(--danger); color:var(--danger); border-radius:10px; padding:8px 12px; font-size:12px; font-weight:700; margin-bottom:10px;">⚠️「${escapeHtml(s.name)}」だとサイズオーバーの可能性があります（${[overThick?'厚み':null, overWeight?'重さ':null].filter(Boolean).join('・')}が上限超え）。上の「おすすめ」から選び直してください</div>`;
+    } else {
+      warnBox.innerHTML = '';
+    }
+  }
+  document.getElementById('exOutRows').addEventListener('input', refreshShipRecommendation);
+  document.getElementById('exOutRows').addEventListener('change', refreshShipRecommendation);
+  document.getElementById('exAddOutRow').addEventListener('click', ()=>setTimeout(refreshShipRecommendation, 0));
+  document.getElementById('exShip').addEventListener('change', validateShipSelection);
+  refreshShipRecommendation();
+
+  function buildDmText(){
+    const t = state.dmTemplates.find(x=>x.id===document.getElementById('exDmSelect').value);
+    if(!t) return '';
+    const ship = state.shippingMethods.find(s=>s.id===document.getElementById('exShip').value);
+    const pack = state.packingMethods.find(p=>p.id===document.getElementById('exPack').value);
+    let text = t.body;
+    text = text.replaceAll('［発送方法］', ship?ship.name:document.getElementById('exDelivery').value);
+    text = text.replaceAll('［梱包方法］', pack?pack.name:'［梱包方法］');
+    text = text.replaceAll('［金額］', document.getElementById('exShortfall').value ? yen(document.getElementById('exShortfall').value) : '［金額］');
+    return text;
+  }
+  function refreshDm(){
+    const text = buildDmText();
+    const box=document.getElementById('exCopyBox'); const btn=document.getElementById('exCopyBtn');
+    if(text){ box.style.display='block'; box.value=text; btn.style.display='block'; } else { box.style.display='none'; btn.style.display='none'; }
+  }
+  function refreshSettlementVisibility(){
+    document.getElementById('exSettlementFields').style.display = document.getElementById('exSettlementNeeded').checked ? 'block' : 'none';
+  }
+  document.getElementById('exSettlementNeeded').addEventListener('change', refreshSettlementVisibility);
+  function refreshPartnerHint(){
+    const userVal = document.getElementById('exPartnerUser').value.trim();
+    const accVal = document.getElementById('exPartnerAccount').value.trim();
+    const hint = document.getElementById('exPartnerHint');
+    if(!userVal && !accVal){ hint.style.display='none'; return; }
+    const candidate = state.exchangeRecords.find(r=>{
+      const un = r.partnerUserName||'', an = r.partnerAccountName||'';
+      const userHit = userVal && un && un!==userVal && (un.includes(userVal) || userVal.includes(un));
+      const accHit = accVal && an && an!==accVal && (an.includes(accVal) || accVal.includes(an));
+      return userHit || accHit;
+    });
+    if(candidate){
+      hint.style.display='block';
+      hint.innerHTML = `もしかして：<b>${escapeHtml(candidate.partnerUserName||'')}${candidate.partnerAccountName?'（'+escapeHtml(candidate.partnerAccountName)+'）':''}</b> ですか？ <button type="button" class="btn btn-ghost btn-sm" id="exPartnerHintUse" style="margin-left:6px;">これを使う</button>`;
+      const useBtn = document.getElementById('exPartnerHintUse');
+      if(useBtn) useBtn.onclick=()=>{
+        document.getElementById('exPartnerUser').value = candidate.partnerUserName||'';
+        document.getElementById('exPartnerAccount').value = candidate.partnerAccountName||'';
+        hint.style.display='none';
+      };
+    } else { hint.style.display='none'; }
+  }
+  document.getElementById('exPartnerUser').addEventListener('input', refreshPartnerHint);
+  document.getElementById('exPartnerAccount').addEventListener('input', refreshPartnerHint);
+  ['exDmSelect','exShip','exPack','exShortfall','exDelivery'].forEach(id=>document.getElementById(id).addEventListener('input', refreshDm));
+  const histSel = document.getElementById('exDmHistorySelect');
+  if(histSel) histSel.addEventListener('input', ()=>{
+    const h = state.dmHistory.find(x=>x.id===histSel.value);
+    if(h){ document.getElementById('exCopyBox').style.display='block'; document.getElementById('exCopyBox').value=h.text; document.getElementById('exCopyBtn').style.display='block'; }
+  });
+  document.querySelectorAll('#exDmQuickButtons [data-quickdm]').forEach(lb=>{
+    lb.onclick=()=>{
+      document.querySelectorAll('#exDmQuickButtons label').forEach(x=>x.style.background='var(--surface)');
+      lb.style.background='var(--surface2)';
+      document.getElementById('exDmSelect').value = lb.dataset.quickdm;
+      refreshDm();
+    };
+  });
+  document.getElementById('genFirstDmBtn').onclick=()=>{
+    const outIds = [...document.querySelectorAll('#exOutRows .exOutItem')].map(s=>s.value).filter(Boolean);
+    const outItems = outIds.map(id=>state.items.find(i=>i.id===id)).filter(Boolean);
+    const scheduledDate = document.getElementById('exScheduled').value;
+    const text = generateFirstDmText(outItems, scheduledDate);
+    const box=document.getElementById('exCopyBox'); const btn=document.getElementById('exCopyBtn');
+    box.style.display='block'; box.value=text; btn.style.display='block';
+    showToast('初回DM文面を生成しました。内容を確認・編集してからコピーしてね');
+  };
+  document.getElementById('exCopyBtn').onclick=async()=>{
+    const text = document.getElementById('exCopyBox').value;
+    navigator.clipboard.writeText(text); showToast('コピーしました');
+    await addDocTo('dmHistory', {text, createdAtStr:new Date().toISOString()});
+  };
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+  document.getElementById('mSave').onclick=async()=>{
+    document.getElementById('mSave').textContent='保存中…';
+    const outItemsLinked = [...document.querySelectorAll('#exOutRows [data-outrow]')].map(row=>({
+      itemId: row.querySelector('.exOutItem').value, qty: Number(row.querySelector('.exOutQty').value)||1,
+    })).filter(o=>o.itemId);
+    const inRowEls = [...document.querySelectorAll('#exInRows [data-inrow]')];
+    const inItemsLinked = [];
+    for(const row of inRowEls){
+      const oshiName = row.querySelector('.exInOshi').value.trim();
+      if(!oshiName) continue;
+      const entry = {
+        oshiName, name: row.querySelector('.exInName').value.trim(),
+        qty: Number(row.querySelector('.exInQty').value)||1,
+        releaseId: row.querySelector('.exInRelease').value||null,
+        linkedItemId: row.querySelector('.exInLinked').value||null,
+        imageUrl: null,
+      };
+      const fileInput = row.querySelector('.exInImage');
+      if(fileInput.files[0]){
+        try{ entry.imageUrl = await uploadItemImage(fileInput.files[0], 'in_'+uidGen()); }catch(e){ /* 画像アップロード失敗時はスキップ */ }
+      }
+      inItemsLinked.push(entry);
+    }
+    const newStatus = document.getElementById('exStatus').value;
+    const data={
+      dealType:document.getElementById('exDealType').value,
+      partnerUserName:document.getElementById('exPartnerUser').value.trim(),
+      partnerAccountName:document.getElementById('exPartnerAccount').value.trim(),
+      date:document.getElementById('exDate').value,
+      outItemsLinked, inItemsLinked,
+      shortfallAmount:Number(document.getElementById('exShortfall').value)||0,
+      settlementNeeded:document.getElementById('exSettlementNeeded').checked,
+      paymentReceived:document.getElementById('exPaymentReceived').checked,
+      paymentDate:document.getElementById('exPaymentDate').value||null,
+      deliveryMethod:document.getElementById('exDelivery').value,
+      scheduledDate:document.getElementById('exScheduled').value||null,
+      sameDayWish:document.getElementById('exSameDay').checked,
+      shippingMethodId:document.getElementById('exShip').value||null,
+      packingMethodId:document.getElementById('exPack').value||null,
+      status:newStatus,
+      mySent:document.getElementById('exMySent').checked,
+      mySentDate:document.getElementById('exMySentDate').value||null,
+      myTracking:document.getElementById('exMyTracking').value,
+      theirSent:document.getElementById('exTheirSent').checked,
+      theirSentDate:document.getElementById('exTheirSentDate').value||null,
+      theirTracking:document.getElementById('exTheirTracking').value,
+    };
+    if(!isEdit || item.status!==newStatus) data.statusUpdatedAt = todayStr();
+    const willApplyStock = newStatus==='完了' && !item.stockApplied;
+    if(willApplyStock) data.stockApplied = true;
+    if(isEdit) await updateDocIn('exchangeRecords', item.id, data); else await addDocTo('exchangeRecords', data);
+    if(willApplyStock) await applyExchangeCompletion(data);
+    showToast('保存しました'); closeModal();
+  };
+}
+
+/* ================================================================
+   ⑥ 交換履歴一覧
+   ================================================================ */
+function renderHistoryTab(){
+  const done = state.exchangeRecords.filter(r=>r.status==='完了').sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const list = done.length ? done.map(r=>{
+    const outTxt = (r.outItemsLinked||[]).map(o=>{ const it=state.items.find(i=>i.id===o.itemId); return it?`${it.oshiName}${it.name?'『'+it.name+'』':''}×${o.qty}`:''; }).filter(Boolean).join('、') || '-';
+    const inTxt = (r.inItemsLinked||[]).map(i=>`${i.oshiName}${i.name?'『'+i.name+'』':''}×${i.qty}`).join('、') || '-';
+    return `<div class="list-item"><div><div class="meta">${escapeHtml(partnerLabel(r))}</div>
+      <div class="sub-meta">${escapeHtml(r.date||'')}　渡す：${escapeHtml(outTxt)}／もらう：${escapeHtml(inTxt)}</div></div></div>`;
+  }).join('') : `<div class="empty">完了した交換記録がありません</div>`;
+  return `<div class="card"><h2>交換履歴一覧 <span class="badge good">${done.length}件</span></h2>${list}
+    <button class="btn btn-ghost btn-block" id="exportHistoryCsvBtn" style="margin-top:10px;">📄 交換履歴をCSVで書き出す</button></div>`;
+}
+function bindHistoryEvents(){
+  const csvBtn=document.getElementById('exportHistoryCsvBtn');
+  if(csvBtn) csvBtn.onclick=()=>{
+    const done = state.exchangeRecords.filter(r=>r.status==='完了');
+    const rows = [['交換日','ユーザー名','アカウント名','渡したグッズ','もらったグッズ','精算金額']];
+    done.forEach(r=>{
+      const outTxt = (r.outItemsLinked||[]).map(o=>{ const it=state.items.find(i=>i.id===o.itemId); return it?`${it.oshiName}${it.name?'『'+it.name+'』':''}×${o.qty}`:''; }).filter(Boolean).join('、');
+      const inTxt = (r.inItemsLinked||[]).map(i=>`${i.oshiName}${i.name?'『'+i.name+'』':''}×${i.qty}`).join('、');
+      rows.push([r.date||'', r.partnerUserName||'', r.partnerAccountName||'', outTxt, inTxt, r.shortfallAmount||0]);
+    });
+    downloadCsv(`交換履歴_${todayStr()}.csv`, rows);
+  };
+}
+
+applyTheme();
+</script>
+</body>
+</html>
