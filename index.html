@@ -1507,15 +1507,23 @@ function formatDateJp(dateStr){
   const w = ['日','月','火','水','木','金','土'][d.getDay()];
   return `${d.getMonth()+1}/${d.getDate()}(${w})`;
 }
-function generateFirstDmText(outItems, scheduledDate){
-  const releaseNames = [...new Set(outItems.map(i=>{ const r=state.releases.find(x=>x.id===i.releaseId); return r?r.name:null; }).filter(Boolean))];
-  const dealSection = (releaseNames.length? releaseNames.join('、')+'\n' : '') + outItems.map(i=>`・${i.oshiName}${i.name?'『'+i.name+'』':''}`).join('\n');
+function generateFirstDmText(outEntries, scheduledDate){
+  // outEntries: [{item, qty}]
+  const releaseNames = [...new Set(outEntries.map(e=>{ const r=state.releases.find(x=>x.id===e.item.releaseId); return r?r.name:null; }).filter(Boolean))];
+  const dealSection = (releaseNames.length? releaseNames.join('、')+'\n' : '') + outEntries.map(e=>`・${e.item.oshiName}${e.item.name?'『'+e.item.name+'』':''}×${e.qty}`).join('\n');
   const visibleShip = [...state.shippingMethods].sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)).filter(s=>s.visible && (s.platformGroup||'個人')==='個人');
   const shipSection = visibleShip.length ? visibleShip.map(s=>`・${s.name}`).join('\n') : '・（マスタで発送方法を表示ONにしてください）';
-  const packSection = outItems.map(i=>{
-    const release = state.releases.find(r=>r.id===i.releaseId);
-    const pack = release && release.packingCategory ? state.packingMethods.find(p=>p.category===release.packingCategory && p.visible!==false) : null;
-    return `${i.oshiName}${i.name?'『'+i.name+'』':''}\n${pack&&pack.procedureText ? pack.procedureText : '（梱包手順未設定）'}`;
+  // 梱包方法ごとにグルーピングして、同じ手順の重複表示を避ける
+  const packGroups = new Map(); // pmId -> {pm, labels:[]}
+  outEntries.forEach(e=>{
+    const release = state.releases.find(r=>r.id===e.item.releaseId);
+    const pm = release && release.packingCategory ? state.packingMethods.find(p=>p.category===release.packingCategory && p.visible!==false) : null;
+    const key = pm ? pm.id : `none_${e.item.oshiName}${e.item.name||''}`;
+    if(!packGroups.has(key)) packGroups.set(key, {pm, labels:[]});
+    packGroups.get(key).labels.push(`${e.item.oshiName}${e.item.name?'『'+e.item.name+'』':''}×${e.qty}`);
+  });
+  const packSection = [...packGroups.values()].map(g=>{
+    return `${g.labels.join('、')}\n${g.pm&&g.pm.procedureText ? g.pm.procedureText : '（梱包手順未設定）'}`;
   }).join('\n\n');
   return `この度はお声がけいただき、誠にありがとうございます。
 短い間ではございますが、お取引終了までどうぞよろしくお願いいたします。
@@ -1803,7 +1811,7 @@ function openExchangeModal(item){
     <div class="row" style="margin-bottom:10px;"><label class="toggle"><input type="checkbox" id="exSameDay" ${item.sameDayWish?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px;">相手と同日発送を希望</span></div>
     <div class="row2">
       <div class="field-group"><label class="field">発送手段プリセット</label><select id="exShip"><option value="">未定</option></select></div>
-      <div class="field-group"><label class="field">梱包方法</label><select id="exPack"><option value="">未定</option>${state.packingMethods.map(p=>`<option value="${p.id}" ${item.packingMethodId===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select></div>
+      <div class="field-group"><label class="field">梱包方法</label><select id="exPack"><option value="">未定</option>${[...state.packingMethods].sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)).map(p=>`<option value="${p.id}" ${item.packingMethodId===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select></div>
     </div>
     <div id="exShipEstimate" class="hint" style="margin-top:-6px; margin-bottom:8px;"></div>
     <div id="exShipWarning"></div>
@@ -2001,10 +2009,14 @@ function openExchangeModal(item){
     };
   });
   document.getElementById('genFirstDmBtn').onclick=()=>{
-    const outIds = [...document.querySelectorAll('#exOutRows .exOutItem')].map(s=>s.value).filter(Boolean);
-    const outItems = outIds.map(id=>state.items.find(i=>i.id===id)).filter(Boolean);
+    const outEntries = [...document.querySelectorAll('#exOutRows [data-outrow]')].map(row=>{
+      const id = row.querySelector('.exOutItem').value;
+      const qty = Number(row.querySelector('.exOutQty').value)||1;
+      const item = state.items.find(i=>i.id===id);
+      return item ? {item, qty} : null;
+    }).filter(Boolean);
     const scheduledDate = document.getElementById('exScheduled').value;
-    const text = generateFirstDmText(outItems, scheduledDate);
+    const text = generateFirstDmText(outEntries, scheduledDate);
     const box=document.getElementById('exCopyBox'); const btn=document.getElementById('exCopyBtn');
     box.style.display='block'; box.value=text; btn.style.display='block';
     showToast('初回DM文面を生成しました。内容を確認・編集してからコピーしてね');
