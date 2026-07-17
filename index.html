@@ -1595,6 +1595,15 @@ function bindExchangeEvents(){
 }
 /* 交換完了時：渡したグッズの在庫を減らし、もらったグッズを在庫に自動登録・希望リストの決定数を加算 */
 /* グッズ帳（推し活グッズ帳）のcharactersコレクションから推し名で検索、なければ新規作成 */
+/* グッズ名からリリースを検索、なければ最小限の情報で自動作成 */
+async function findOrCreateRelease(name){
+  if(!name || !name.trim()) return null;
+  const trimmed = name.trim();
+  const found = state.releases.find(r=>r.name===trimmed);
+  if(found) return found.id;
+  const ref = await addDocTo('releases', {name:trimmed, definedPrice:0, packingCategory:''});
+  return ref.id;
+}
 async function findOrCreateGoodsCharacter(oshiName){
   if(!oshiName) return null;
   const snap = await getDocs(query(collection(db,'users',uid,'characters')));
@@ -1652,17 +1661,41 @@ async function applyExchangeCompletion(record){
     try{
       const goodsCharId = await findOrCreateGoodsCharacter(inp.oshiName);
       if(goodsCharId){
+        // 同じキャラで似た名前のグッズが既にグッズ帳にないか確認（完全一致で判別できない場合は確認を挟む）
+        const sameChar = state.goodsItems.filter(gi=>gi.characterId===goodsCharId);
+        const targetName = (inp.name||release?.name||'').trim();
+        const exactMatch = targetName ? sameChar.find(gi=>(gi.name||'').trim()===targetName) : null;
+        const fuzzyMatches = targetName ? sameChar.filter(gi=>{
+          const n=(gi.name||'').trim();
+          return n && n!==targetName && (n.includes(targetName) || targetName.includes(n));
+        }) : [];
+        let useExistingId = null;
+        if(exactMatch){
+          useExistingId = exactMatch.id;
+        } else if(fuzzyMatches.length){
+          const names = fuzzyMatches.map(m=>`「${m.name}」`).join('、');
+          const ok = confirm(`推し活グッズ帳に、同じキャラで似た名前のグッズが既にあります（${names}）。\nこれと同じグッズですか？\n\n「OK」→ 既存のグッズ帳エントリに個数を合算します\n「キャンセル」→ 別グッズとして新規登録します`);
+          if(ok) useExistingId = fuzzyMatches[0].id;
+        }
+
         let images = [];
         if(inp.imageUrl){
           try{ const b64 = await urlToBase64(inp.imageUrl); images = [b64]; }catch(e){ /* 画像変換失敗時は画像なしで登録 */ }
         }
-        const goodsRef = await addDoc(collection(db,'users',uid,'items'), {
-          characterId: goodsCharId, name: inp.name||'', series: release?release.name:'', category,
-          price:0, qty:Number(inp.qty)||1, date:todayStr(), memo:'交換アプリで入手',
-          eventName:'', location:'', status:'unopened', images, image: images[0]||null,
-          createdAt: serverTimestamp(),
-        });
-        if(newItemId) await updateDocIn('exchangeItems', newItemId, {linkedGoodsId: goodsRef.id});
+
+        if(useExistingId){
+          const existing = state.goodsItems.find(gi=>gi.id===useExistingId);
+          await updateDocIn('items', useExistingId, { qty: (existing?.qty||0) + (Number(inp.qty)||1) });
+          if(newItemId) await updateDocIn('exchangeItems', newItemId, {linkedGoodsId: useExistingId});
+        } else {
+          const goodsRef = await addDoc(collection(db,'users',uid,'items'), {
+            characterId: goodsCharId, name: inp.name||'', series: release?release.name:'', category,
+            price:0, qty:Number(inp.qty)||1, date:todayStr(), memo:'交換アプリで入手',
+            eventName:'', location:'', status:'unopened', images, image: images[0]||null,
+            createdAt: serverTimestamp(),
+          });
+          if(newItemId) await updateDocIn('exchangeItems', newItemId, {linkedGoodsId: goodsRef.id});
+        }
       }
     }catch(e){ console.error('グッズ帳への連携に失敗しました', e); showToast('グッズ帳への自動登録に失敗しました（在庫への反映は完了しています）'); }
   }
@@ -1674,29 +1707,57 @@ function openExchangeModal(item){
   let inRows = (item.inItemsLinked||[{oshiName:'',name:'',qty:1,linkedItemId:'',releaseId:''}]).map(i=>({...i}));
 
   function outRowHtml(o,i){
-    return `<div class="row2" data-outrow="${i}" style="margin-bottom:6px;">
-      <select class="exOutItem">
+    const availItems = state.items.filter(it=>!it.isWanted && (it.totalQty||0)>0);
+    const releaseIds = [...new Set(availItems.map(it=>it.releaseId).filter(Boolean))];
+    const selReleaseId = o.releaseId || (o.itemId ? (availItems.find(it=>it.id===o.itemId)?.releaseId||'') : '');
+    const oshiOptions = availItems.filter(it=>it.releaseId===selReleaseId);
+    const selOshi = o.oshiName || (o.itemId ? (availItems.find(it=>it.id===o.itemId)?.oshiName||'') : '');
+    const designOptions = oshiOptions.filter(it=>it.oshiName===selOshi);
+    const selItem = availItems.find(it=>it.id===o.itemId);
+    return `<div data-outrow="${i}" style="border:1px solid var(--border); border-radius:10px; padding:8px; margin-bottom:6px;">
+      <label class="field">① グッズ</label>
+      <select class="exOutRelease" style="margin-bottom:6px;">
         <option value="">グッズを選択</option>
-        ${state.items.filter(it=>!it.isWanted && (it.totalQty||0)>0).map(it=>`<option value="${it.id}" ${o.itemId===it.id?'selected':''}>${escapeHtml(it.oshiName)}${it.name?'『'+escapeHtml(it.name)+'』':''}（交換可${it.totalQty||0}）</option>`).join('')}
+        ${releaseIds.map(rid=>{ const r=state.releases.find(x=>x.id===rid); return `<option value="${rid}" ${selReleaseId===rid?'selected':''}>${escapeHtml(r?r.name:'（不明なグッズ）')}</option>`; }).join('')}
       </select>
-      <input type="number" class="exOutQty" value="${o.qty||1}" min="1">
+      <label class="field">② キャラ</label>
+      <select class="exOutOshi" style="margin-bottom:6px;" ${!selReleaseId?'disabled':''}>
+        <option value="">${selReleaseId?'キャラを選択':'先にグッズを選んでください'}</option>
+        ${[...new Set(oshiOptions.map(it=>it.oshiName))].map(name=>`<option value="${escapeHtml(name)}" ${selOshi===name?'selected':''}>${escapeHtml(name)}</option>`).join('')}
+      </select>
+      <label class="field">③ 絵柄・個数</label>
+      <div class="row2">
+        <select class="exOutItem" ${!selOshi?'disabled':''}>
+          <option value="">${selOshi?'絵柄を選択':'先にキャラを選んでください'}</option>
+          ${designOptions.map(it=>`<option value="${it.id}" ${o.itemId===it.id?'selected':''}>${it.name?'『'+escapeHtml(it.name)+'』':'（絵柄名なし）'}（交換可${it.totalQty||0}）</option>`).join('')}
+        </select>
+        <input type="number" class="exOutQty" value="${o.qty||1}" min="1" max="${selItem?selItem.totalQty||1:99}">
+      </div>
     </div>`;
   }
   function inRowHtml(i2,idx){
     const linked = i2.linkedItemId ? state.items.find(it=>it.id===i2.linkedItemId) : null;
+    const releaseName = i2.releaseName || (i2.releaseId?(state.releases.find(r=>r.id===i2.releaseId)?.name||''):'');
+    // 同じグッズ名で既に登録されているキャラ・絵柄があれば候補として出す
+    const matchedRelease = state.releases.find(r=>r.name===releaseName);
+    const relatedItems = matchedRelease ? state.items.filter(it=>it.releaseId===matchedRelease.id) : [];
+    const charDatalistId = `charListEx_${idx}`;
+    const designDatalistId = `designListEx_${idx}`;
     return `<div data-inrow="${idx}" style="border:1px solid var(--border); border-radius:10px; padding:8px; margin-bottom:6px;">
       <div class="row2" style="margin-bottom:6px;">
         <select class="exInLinked"><option value="">✏️ 手入力する（異種交換・求リストと紐付けない）</option>${state.items.filter(it=>it.isWanted).map(w=>`<option value="${w.id}" ${i2.linkedItemId===w.id?'selected':''}>🔗 ${escapeHtml(w.oshiName)}${w.name?'『'+escapeHtml(w.name)+'』':''}（求めてる絵柄）</option>`).join('')}</select>
         <input type="number" class="exInQty" value="${i2.qty||1}" min="1">
       </div>
-      <div class="row2" style="margin-bottom:6px; ${linked?'display:none;':''}">
-        <input type="text" class="exInOshi" list="charListEx" placeholder="キャラ名（手入力）" value="${escapeHtml(linked?linked.oshiName:(i2.oshiName||''))}">
-        <input type="text" class="exInName" placeholder="絵柄名(任意)" value="${escapeHtml(linked?(linked.name||''):(i2.name||''))}">
+      ${linked?`<div class="hint" style="margin-bottom:6px;">🔗 ${escapeHtml(linked.oshiName)}${linked.name?'『'+escapeHtml(linked.name)+'』':''} に紐付け済み（キャラ名・絵柄名・グッズ名は自動で使われます）</div>`:`
+      <div class="field-group" style="margin-bottom:6px;"><label class="field">① グッズ名（新規入力もOK・既存候補から選択も可能）</label><input type="text" class="exInReleaseName" list="releaseListEx" placeholder="例）Rainy Day Laundry 缶バッジ" value="${escapeHtml(releaseName)}"></div>
+      <div class="row2" style="margin-bottom:6px;">
+        <div><label class="field">② キャラ名</label><input type="text" class="exInOshi" list="${charDatalistId}" placeholder="キャラ名（手入力）" value="${escapeHtml(i2.oshiName||'')}"></div>
+        <div><label class="field">③ 絵柄名(任意)</label><input type="text" class="exInName" list="${designDatalistId}" placeholder="絵柄名(任意)" value="${escapeHtml(i2.name||'')}"></div>
       </div>
-      ${!linked?`<div class="hint" style="margin-bottom:6px;">異種交換など求リストにないグッズは、ここに直接キャラ名を入力すればOK。完了時にグッズ管理へそのまま新規登録されます</div>`:''}
-      ${linked?`<div class="hint" style="margin-bottom:6px;">🔗 ${escapeHtml(linked.oshiName)}${linked.name?'『'+escapeHtml(linked.name)+'』':''} に紐付け済み（キャラ名・絵柄名は自動で使われます）</div>`:''}
+      <datalist id="${charDatalistId}">${[...new Set(relatedItems.map(it=>it.oshiName))].map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
+      <datalist id="${designDatalistId}">${[...new Set(relatedItems.filter(it=>it.oshiName===i2.oshiName).map(it=>it.name).filter(Boolean))].map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
+      <div class="hint" style="margin-bottom:6px;">異種交換など求リストにないグッズは、ここに直接入力すればOK。完了時にグッズ管理へそのまま新規登録されます</div>`}
       <div class="row2">
-        <select class="exInRelease"><option value="">グッズ未設定</option>${state.releases.map(r=>`<option value="${r.id}" ${i2.releaseId===r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}</select>
         <input type="file" class="exInImage" accept="image/*">
       </div>
     </div>`;
@@ -1707,6 +1768,7 @@ function openExchangeModal(item){
   const partnerOpts = allPartnerNameOptions();
   host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>${isEdit?'交換記録を編集':'交換記録を追加'}</h3>
     <datalist id="charListEx">${allCharacterNameOptions().map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
+    <datalist id="releaseListEx">${state.releases.map(r=>`<option value="${escapeHtml(r.name)}">`).join('')}</datalist>
     <datalist id="userNameListEx">${partnerOpts.names.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
     <datalist id="accountNameListEx">${partnerOpts.accounts.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
     <div class="field-group"><label class="field">取引タイプ</label>
@@ -1839,19 +1901,45 @@ function openExchangeModal(item){
   document.getElementById('exAddOutRow').addEventListener('click', ()=>setTimeout(refreshShipRecommendation, 0));
   document.getElementById('exShip').addEventListener('change', validateShipSelection);
   refreshShipRecommendation();
-  document.getElementById('exInRows').addEventListener('change', (e)=>{
-    if(!e.target.classList.contains('exInLinked')) return;
-    const rowEl = e.target.closest('[data-inrow]');
-    const idx = Number(rowEl.dataset.inrow);
-    const linkedId = e.target.value;
+  document.getElementById('exOutRows').addEventListener('change', (e)=>{
+    if(!e.target.classList.contains('exOutRelease') && !e.target.classList.contains('exOutOshi')) return;
+    const rowEl = e.target.closest('[data-outrow]');
+    const idx = Number(rowEl.dataset.outrow);
+    const isReleaseChange = e.target.classList.contains('exOutRelease');
     const current = {
-      oshiName: rowEl.querySelector('.exInOshi')?.value||'',
-      name: rowEl.querySelector('.exInName')?.value||'',
-      qty: Number(rowEl.querySelector('.exInQty').value)||1,
-      linkedItemId: linkedId,
-      releaseId: rowEl.querySelector('.exInRelease').value||'',
+      releaseId: rowEl.querySelector('.exOutRelease').value,
+      oshiName: isReleaseChange ? '' : rowEl.querySelector('.exOutOshi').value,
+      itemId: '',
+      qty: 1,
     };
-    rowEl.outerHTML = inRowHtml(current, idx);
+    rowEl.outerHTML = outRowHtml(current, idx);
+  });
+  document.getElementById('exInRows').addEventListener('change', (e)=>{
+    if(e.target.classList.contains('exInLinked')){
+      const rowEl = e.target.closest('[data-inrow]');
+      const idx = Number(rowEl.dataset.inrow);
+      const linkedId = e.target.value;
+      const releaseNameInput = rowEl.querySelector('.exInReleaseName');
+      const current = {
+        oshiName: rowEl.querySelector('.exInOshi')?.value||'',
+        name: rowEl.querySelector('.exInName')?.value||'',
+        qty: Number(rowEl.querySelector('.exInQty').value)||1,
+        linkedItemId: linkedId,
+        releaseName: releaseNameInput ? releaseNameInput.value : '',
+      };
+      rowEl.outerHTML = inRowHtml(current, idx);
+    } else if(e.target.classList.contains('exInReleaseName')){
+      const rowEl = e.target.closest('[data-inrow]');
+      const idx = Number(rowEl.dataset.inrow);
+      const current = {
+        oshiName: rowEl.querySelector('.exInOshi')?.value||'',
+        name: rowEl.querySelector('.exInName')?.value||'',
+        qty: Number(rowEl.querySelector('.exInQty').value)||1,
+        linkedItemId: '',
+        releaseName: e.target.value,
+      };
+      rowEl.outerHTML = inRowHtml(current, idx);
+    }
   });
 
   function buildDmText(){
@@ -1938,10 +2026,12 @@ function openExchangeModal(item){
     for(const row of inRowEls){
       const oshiName = row.querySelector('.exInOshi').value.trim();
       if(!oshiName) continue;
+      const releaseNameInput = row.querySelector('.exInReleaseName');
+      const releaseId = releaseNameInput ? await findOrCreateRelease(releaseNameInput.value) : null;
       const entry = {
         oshiName, name: row.querySelector('.exInName').value.trim(),
         qty: Number(row.querySelector('.exInQty').value)||1,
-        releaseId: row.querySelector('.exInRelease').value||null,
+        releaseId,
         linkedItemId: row.querySelector('.exInLinked').value||null,
         imageUrl: null,
       };
