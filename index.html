@@ -1521,4 +1521,442 @@ function renderExchangeTab(){
   const thisMonth = todayStr().slice(0,7);
   const monthCount = state.exchangeRecords.filter(r=>(r.date||'').slice(0,7)===thisMonth).length;
   const list = active.length ? active.map(renderExchangeCard).join('') : `<div class="empty">進行中の交換記録がありません</div>`;
-  return `<div class="card"><h2>交換記録 <span class="badge">${active.length}件 進行中
+  return `<div class="card"><h2>交換記録 <span class="badge">${active.length}件 進行中</span> <span class="badge good">今月${monthCount}件</span></h2>${list}
+    <button class="btn btn-primary btn-block" id="addExBtn" style="margin-top:8px;">＋ 交換記録を追加</button></div>`;
+}
+function renderExchangeCard(r){
+  const statusPill = {'フォロー待ち':'gray','DM待ち':'gray','送付先待ち':'gray','交渉中':'orange','発送待ち':'orange','発送済み':'blue','受取確認待ち':'blue','完了':'green'}[r.status]||'gray';
+  const reminder = exchangeReminder(r);
+  const mySentPill = r.mySent ? 'green' : 'gray';
+  const theirSentPill = r.theirSent ? 'green' : 'gray';
+  const outTxt = (r.outItemsLinked||[]).map(o=>{ const it=state.items.find(i=>i.id===o.itemId); return it?`${it.oshiName}${it.name?'『'+it.name+'』':''}×${o.qty}`:''; }).filter(Boolean).join('、') || '-';
+  const inTxt = (r.inItemsLinked||[]).map(i=>`${i.oshiName}${i.name?'『'+i.name+'』':''}×${i.qty}`).join('、') || '-';
+  const paymentPill = r.paymentReceived ? 'green' : 'orange';
+  return `<div class="item-card" data-ex-id="${r.id}">
+    <div class="top"><div><div class="name">${escapeHtml(partnerLabel(r))}</div>
+      <div class="sub-meta">${escapeHtml(r.date||'')}${r.dealType?'・'+escapeHtml(r.dealType):''}${r.deliveryMethod?'・'+escapeHtml(r.deliveryMethod):''}${r.scheduledDate?`・予定日${escapeHtml(r.scheduledDate)}`:''}${r.sameDayWish?'・同日発送希望':''}</div></div>
+      <div class="actions"><button class="iconsm" data-act="edit-ex" data-id="${r.id}">✏️</button><button class="iconsm" data-act="del-ex" data-id="${r.id}">🗑️</button></div>
+    </div>
+    <div class="tags"><span class="tag">渡す：${escapeHtml(outTxt)}</span><span class="tag">もらう：${escapeHtml(inTxt)}</span></div>
+    ${r.settlementNeeded?`<div class="tags"><span class="tag">精算：${yen(r.shortfallAmount)}</span></div>`:''}
+    <div class="status-row">
+      <span class="status-pill ${statusPill}">${escapeHtml(r.status||'交渉中')}</span>
+      <span class="status-pill ${mySentPill}">自分：${r.mySent?'発送済み'+(r.mySentDate?`(${escapeHtml(r.mySentDate)})`:''):'未発送'}</span>
+      <span class="status-pill ${theirSentPill}">相手：${r.theirSent?'発送済み'+(r.theirSentDate?`(${escapeHtml(r.theirSentDate)})`:''):'未発送'}</span>
+      ${r.settlementNeeded?`<span class="status-pill ${paymentPill}">入金：${r.paymentReceived?'確認済み'+(r.paymentDate?`(${escapeHtml(r.paymentDate)})`:''):'未確認'}</span>`:''}
+    </div>
+    ${(r.myTracking||r.theirTracking)?`<div class="tags">${r.myTracking?`<span class="tag">自分の追跡番号：${escapeHtml(r.myTracking)}</span>`:''}${r.theirTracking?`<span class="tag">相手の追跡番号：${escapeHtml(r.theirTracking)}</span>`:''}</div>`:''}
+    ${reminder?`<div class="reminder-badge">${reminder}</div>`:''}
+  </div>`;
+}
+function bindExchangeEvents(){
+  const addBtn=document.getElementById('addExBtn'); if(addBtn) addBtn.onclick=()=>openExchangeModal({});
+  document.querySelectorAll('[data-act="edit-ex"]').forEach(b=>b.onclick=()=>openExchangeModal(state.exchangeRecords.find(r=>r.id===b.dataset.id)));
+  document.querySelectorAll('[data-act="del-ex"]').forEach(b=>b.onclick=async()=>{ if(confirm('削除しますか？')){ await deleteDocIn('exchangeRecords', b.dataset.id); showToast('削除しました'); } });
+}
+/* 交換完了時：渡したグッズの在庫を減らし、もらったグッズを在庫に自動登録・希望リストの決定数を加算 */
+/* グッズ帳（推し活グッズ帳）のcharactersコレクションから推し名で検索、なければ新規作成 */
+async function findOrCreateGoodsCharacter(oshiName){
+  if(!oshiName) return null;
+  const snap = await getDocs(query(collection(db,'users',uid,'characters')));
+  const found = snap.docs.find(d=>(d.data().name||'')===oshiName);
+  if(found) return found.id;
+  const ref = await addDoc(collection(db,'users',uid,'characters'), {
+    name: oshiName, color:'#FF6FA5', image:null, shopUrl:'', order: snap.size, createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+/* imageUrlは既にFirestore保存用のdata URL（base64）なので、そのまま使う。念のためBlob URL等が来た場合のみ変換する */
+async function urlToBase64(url){
+  if(url && url.startsWith('data:')) return url;
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+async function applyExchangeCompletion(record){
+  for(const o of (record.outItemsLinked||[])){
+    const it = state.items.find(i=>i.id===o.itemId);
+    if(!it) continue;
+    const newTotal = Math.max(0, (it.totalQty||0) - (Number(o.qty)||0));
+    await updateDocIn('exchangeItems', it.id, { totalQty:newTotal });
+  }
+  for(const inp of (record.inItemsLinked||[])){
+    let newItemId, releaseId = inp.releaseId||null, category='';
+    const release = state.releases.find(r=>r.id===releaseId);
+    if(release) category = release.packingCategory||'';
+
+    if(inp.linkedItemId){
+      // 既存の「求めてる絵柄」エントリの所持数を加算
+      const w = state.items.find(x=>x.id===inp.linkedItemId);
+      if(w){
+        await updateDocIn('exchangeItems', w.id, { totalQty: (w.totalQty||0) + (Number(inp.qty)||0) });
+        newItemId = w.id;
+        releaseId = w.releaseId||releaseId;
+      }
+    } else {
+      const newRef = await addDocTo('exchangeItems', {
+        releaseId, oshiName: inp.oshiName||'', name: inp.name||'',
+        totalQty: Number(inp.qty)||1, hasDamage:false, damageNote:'',
+        imageUrl: inp.imageUrl||null,
+        isWanted:false, wantedTarget:null, priority:false,
+        saleStatus:null, saleStatusDate:todayStr(),
+      });
+      newItemId = newRef?.id;
+    }
+
+    // 推し活グッズ帳への自動連携
+    try{
+      const goodsCharId = await findOrCreateGoodsCharacter(inp.oshiName);
+      if(goodsCharId){
+        let images = [];
+        if(inp.imageUrl){
+          try{ const b64 = await urlToBase64(inp.imageUrl); images = [b64]; }catch(e){ /* 画像変換失敗時は画像なしで登録 */ }
+        }
+        const goodsRef = await addDoc(collection(db,'users',uid,'items'), {
+          characterId: goodsCharId, name: inp.name||'', series: release?release.name:'', category,
+          price:0, qty:Number(inp.qty)||1, date:todayStr(), memo:'交換アプリで入手',
+          eventName:'', location:'', status:'unopened', images, image: images[0]||null,
+          createdAt: serverTimestamp(),
+        });
+        if(newItemId) await updateDocIn('exchangeItems', newItemId, {linkedGoodsId: goodsRef.id});
+      }
+    }catch(e){ console.error('グッズ帳への連携に失敗しました', e); showToast('グッズ帳への自動登録に失敗しました（在庫への反映は完了しています）'); }
+  }
+}
+function openExchangeModal(item){
+  const isEdit=!!item.id; const host=document.getElementById('modalHost');
+  const visibleShip = state.shippingMethods.filter(s=>s.visible && (s.platformGroup||'個人')==='個人');
+  let outRows = (item.outItemsLinked||[{itemId:'',qty:1}]).map(o=>({...o}));
+  let inRows = (item.inItemsLinked||[{oshiName:'',name:'',qty:1,linkedItemId:'',releaseId:''}]).map(i=>({...i}));
+
+  function outRowHtml(o,i){
+    return `<div class="row2" data-outrow="${i}" style="margin-bottom:6px;">
+      <select class="exOutItem">
+        <option value="">グッズを選択</option>
+        ${state.items.filter(it=>!it.isWanted && (it.totalQty||0)>0).map(it=>`<option value="${it.id}" ${o.itemId===it.id?'selected':''}>${escapeHtml(it.oshiName)}${it.name?'『'+escapeHtml(it.name)+'』':''}（交換可${it.totalQty||0}）</option>`).join('')}
+      </select>
+      <input type="number" class="exOutQty" value="${o.qty||1}" min="1">
+    </div>`;
+  }
+  function inRowHtml(i2,idx){
+    return `<div data-inrow="${idx}" style="border:1px solid var(--border); border-radius:10px; padding:8px; margin-bottom:6px;">
+      <div class="row2" style="margin-bottom:6px;">
+        <select class="exInLinked"><option value="">新規（求リストと紐付けない）</option>${state.items.filter(it=>it.isWanted).map(w=>`<option value="${w.id}" ${i2.linkedItemId===w.id?'selected':''}>${escapeHtml(w.oshiName)}${w.name?'『'+escapeHtml(w.name)+'』':''}（求めてる絵柄）</option>`).join('')}</select>
+        <input type="number" class="exInQty" value="${i2.qty||1}" min="1">
+      </div>
+      <div class="row2" style="margin-bottom:6px;">
+        <input type="text" class="exInOshi" list="charListEx" placeholder="キャラ名" value="${escapeHtml(i2.oshiName||'')}">
+        <input type="text" class="exInName" placeholder="絵柄名(任意)" value="${escapeHtml(i2.name||'')}">
+      </div>
+      <div class="row2">
+        <select class="exInRelease"><option value="">グッズ未設定</option>${state.releases.map(r=>`<option value="${r.id}" ${i2.releaseId===r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}</select>
+        <input type="file" class="exInImage" accept="image/*">
+      </div>
+    </div>`;
+  }
+
+  const recentDm = [...state.dmHistory].sort((a,b)=>(b.createdAtStr||'').localeCompare(a.createdAtStr||'')).slice(0,10);
+
+  const partnerOpts = allPartnerNameOptions();
+  host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>${isEdit?'交換記録を編集':'交換記録を追加'}</h3>
+    <datalist id="charListEx">${allCharacterNameOptions().map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
+    <datalist id="userNameListEx">${partnerOpts.names.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
+    <datalist id="accountNameListEx">${partnerOpts.accounts.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
+    <div class="field-group"><label class="field">取引タイプ</label>
+      <select id="exDealType">${DEAL_TYPES.map(t=>`<option value="${t}" ${item.dealType===t?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="row2">
+      <div class="field-group"><label class="field">ユーザー名</label><input type="text" id="exPartnerUser" list="userNameListEx" placeholder="例）うさぎ様" value="${escapeHtml(item.partnerUserName||'')}"></div>
+      <div class="field-group"><label class="field">アカウント名（SNS ID等）</label><input type="text" id="exPartnerAccount" list="accountNameListEx" placeholder="例）@usagi_xxx" value="${escapeHtml(item.partnerAccountName||'')}"></div>
+    </div>
+    <div id="exPartnerHint" class="hint" style="display:none;"></div>
+    <div class="field-group"><label class="field">交換日</label><input type="date" id="exDate" value="${item.date||todayStr()}"></div>
+
+    <label class="field">渡すグッズ（グッズ管理から選択）</label>
+    <div id="exOutRows">${outRows.map(outRowHtml).join('')}</div>
+    <button class="btn btn-ghost btn-sm" id="exAddOutRow" style="margin-bottom:10px;">＋ 行を追加</button>
+
+    <label class="field">もらうグッズ（完了時に自動でグッズ管理へ反映）</label>
+    <div id="exInRows">${inRows.map(inRowHtml).join('')}</div>
+    <button class="btn btn-ghost btn-sm" id="exAddInRow" style="margin-bottom:10px;">＋ 行を追加</button>
+
+    <div class="card" style="background:var(--surface2); border:1px solid var(--border); padding:12px; margin:0 0 12px;">
+      <div class="row" style="margin-bottom:8px;"><label class="toggle"><input type="checkbox" id="exSettlementNeeded" ${item.settlementNeeded?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px; font-weight:700;">精算あり（差額のやり取り・買取金額など）</span></div>
+      <div id="exSettlementFields" style="${item.settlementNeeded?'':'display:none;'}">
+        <label class="field">精算金額（円）</label><input type="number" id="exShortfall" value="${item.shortfallAmount??0}">
+        <div class="row" style="margin:8px 0 6px;"><label class="toggle"><input type="checkbox" id="exPaymentReceived" ${item.paymentReceived?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px; font-weight:700;">入金確認済み</span></div>
+        <label class="field">入金日（任意）</label><input type="date" id="exPaymentDate" value="${item.paymentDate||''}">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field-group"><label class="field">発送方法</label><select id="exDelivery"><option value="手渡し" ${item.deliveryMethod==='手渡し'?'selected':''}>手渡し</option><option value="郵送" ${item.deliveryMethod==='郵送'?'selected':''}>郵送</option></select></div>
+      <div class="field-group"><label class="field">予定日</label><input type="date" id="exScheduled" value="${item.scheduledDate||''}"></div>
+    </div>
+    <div class="row" style="margin-bottom:10px;"><label class="toggle"><input type="checkbox" id="exSameDay" ${item.sameDayWish?'checked':''}><span class="slider"></span></label><span style="font-size:12.5px;">相手と同日発送を希望</span></div>
+    <div class="row2">
+      <div class="field-group"><label class="field">発送手段プリセット</label><select id="exShip"><option value="">未定</option></select></div>
+      <div class="field-group"><label class="field">梱包方法</label><select id="exPack"><option value="">未定</option>${state.packingMethods.map(p=>`<option value="${p.id}" ${item.packingMethodId===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select></div>
+    </div>
+    <div id="exShipEstimate" class="hint" style="margin-top:-6px; margin-bottom:8px;"></div>
+    <div id="exShipWarning"></div>
+    <div class="field-group"><label class="field">ステータス</label><select id="exStatus">${EXCHANGE_STATUS_STEPS.map(s=>`<option ${item.status===s?'selected':''}>${s}</option>`).join('')}</select>
+      ${item.status==='完了'&&item.stockApplied?'<div class="hint">✅ 在庫反映済みです</div>':'<div class="hint">「完了」で保存すると自動で在庫に反映されます（初回のみ）</div>'}</div>
+
+    <div class="card" style="background:var(--surface2); border:1px solid var(--border); padding:12px; margin:0 0 12px;">
+      <div style="font-size:12px; font-weight:800; margin-bottom:8px;">発送状況（自分／相手）</div>
+      <div class="row2">
+        <div>
+          <div class="row" style="margin-bottom:6px;"><label class="toggle"><input type="checkbox" id="exMySent" ${item.mySent?'checked':''}><span class="slider"></span></label><span style="font-size:12px;">自分：発送済み</span></div>
+          <label class="field">発送日</label><input type="date" id="exMySentDate" value="${item.mySentDate||''}">
+          <label class="field" style="margin-top:6px;">追跡番号</label><input type="text" id="exMyTracking" value="${escapeHtml(item.myTracking||'')}">
+        </div>
+        <div>
+          <div class="row" style="margin-bottom:6px;"><label class="toggle"><input type="checkbox" id="exTheirSent" ${item.theirSent?'checked':''}><span class="slider"></span></label><span style="font-size:12px;">相手：発送済み</span></div>
+          <label class="field">発送日</label><input type="date" id="exTheirSentDate" value="${item.theirSentDate||''}">
+          <label class="field" style="margin-top:6px;">追跡番号</label><input type="text" id="exTheirTracking" value="${escapeHtml(item.theirTracking||'')}">
+        </div>
+      </div>
+      <div class="hint">両方「発送済み」になったらステータスを「受取確認待ち」に更新するのを忘れずに</div>
+    </div>
+    <button class="btn btn-primary btn-block" id="genFirstDmBtn" style="margin-bottom:10px;">📋 初回DM文面を自動生成する</button>
+    <div class="field-group"><label class="field">DMテンプレート（ワンタップで挿入）</label>
+      <div class="chip-select" id="exDmQuickButtons">${state.dmTemplates.map(t=>`<label style="cursor:pointer;" data-quickdm="${t.id}"><input type="radio" name="exDmQuick" style="display:none;">${escapeHtml(t.scene)}：${escapeHtml(t.name)}</label>`).join('') || '<span class="hint">マスタでDMテンプレを登録してください</span>'}</div>
+      <select id="exDmSelect" style="display:none;"><option value="">選択して挿入</option>${state.dmTemplates.map(t=>`<option value="${t.id}">${escapeHtml(t.scene)} / ${escapeHtml(t.name)}</option>`).join('')}</select></div>
+    ${recentDm.length?`<div class="field-group"><label class="field">過去の下書きから呼び出す</label><select id="exDmHistorySelect"><option value="">選択してください</option>${recentDm.map(h=>`<option value="${h.id}">${escapeHtml((h.text||'').slice(0,20))}…</option>`).join('')}</select></div>`:''}
+    <textarea id="exCopyBox" style="display:none; min-height:220px;"></textarea>
+    <button class="btn btn-ghost btn-block" id="exCopyBtn" style="display:none; margin-top:6px;">コピーする</button>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">キャンセル</button><button class="btn btn-primary" id="mSave">保存</button></div>
+  </div></div>`;
+
+  function bindRowEvents(){
+    document.getElementById('exAddOutRow').onclick=()=>{ outRows.push({itemId:'',qty:1}); document.getElementById('exOutRows').insertAdjacentHTML('beforeend', outRowHtml({itemId:'',qty:1}, outRows.length-1)); };
+    document.getElementById('exAddInRow').onclick=()=>{ inRows.push({oshiName:'',name:'',qty:1,linkedItemId:'',releaseId:''}); document.getElementById('exInRows').insertAdjacentHTML('beforeend', inRowHtml({oshiName:'',name:'',qty:1,linkedItemId:'',releaseId:''}, inRows.length-1)); };
+  }
+  bindRowEvents();
+
+  function estimateOutSize(){
+    const rows = [...document.querySelectorAll('#exOutRows [data-outrow]')];
+    let thicknessMm=0, weightG=0; const usedNames=[]; const baseAdded=new Set();
+    rows.forEach(row=>{
+      const itemId = row.querySelector('.exOutItem').value;
+      const qty = Number(row.querySelector('.exOutQty').value)||0;
+      if(!itemId) return;
+      const it = state.items.find(x=>x.id===itemId);
+      if(!it) return;
+      const release = state.releases.find(r=>r.id===it.releaseId);
+      let pm = null;
+      if(release && release.packingCategory){
+        pm = state.packingMethods.find(p=>p.category===release.packingCategory && p.visible!==false) || state.packingMethods.find(p=>p.category===release.packingCategory);
+      }
+      if(pm){
+        if(!baseAdded.has(pm.id)){ thicknessMm += (pm.baseThicknessMm||0); weightG += (pm.baseWeightG||0); baseAdded.add(pm.id); }
+        thicknessMm += (pm.unitThicknessMm||0)*qty; weightG += (pm.unitWeightG||0)*qty; usedNames.push(pm.name);
+      }
+    });
+    return {thicknessMm:Math.round(thicknessMm*10)/10, weightG:Math.round(weightG), usedNames};
+  }
+  function refreshShipRecommendation(){
+    const est = estimateOutSize();
+    const estBox = document.getElementById('exShipEstimate');
+    estBox.textContent = (est.thicknessMm>0||est.weightG>0) ? `📦 推定サイズ：厚み約${est.thicknessMm}mm・重さ約${est.weightG}g（${[...new Set(est.usedNames)].join('、')}を基に算出）` : '梱包カテゴリー未設定のグッズは推定に含まれません';
+    const shipSel = document.getElementById('exShip');
+    const prevValue = shipSel.value;
+    const recommended = (est.thicknessMm>0||est.weightG>0) ? recommendShippingMethods(est.thicknessMm/10, est.weightG/1000).filter(s=>s.visible && (s.platformGroup||'個人')==='個人') : [];
+    const recIds = new Set(recommended.slice(0,5).map(s=>s.id));
+    const others = visibleShip.filter(s=>!recIds.has(s.id));
+    let html = '<option value="">未定</option>';
+    if(recommended.length){
+      html += `<optgroup label="🔍 このグッズにおすすめ">${recommended.slice(0,5).map(s=>`<option value="${s.id}">${escapeHtml(s.name)}（${s.price>=0?yen(s.price):'料金別途'}）</option>`).join('')}</optgroup>`;
+    }
+    html += `<optgroup label="その他の発送方法">${others.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}</optgroup>`;
+    shipSel.innerHTML = html;
+    shipSel.value = (prevValue && [...shipSel.options].some(o=>o.value===prevValue)) ? prevValue : (item.shippingMethodId && [...shipSel.options].some(o=>o.value===item.shippingMethodId) ? item.shippingMethodId : '');
+    validateShipSelection();
+  }
+  function validateShipSelection(){
+    const shipSel = document.getElementById('exShip');
+    const warnBox = document.getElementById('exShipWarning');
+    const s = state.shippingMethods.find(x=>x.id===shipSel.value);
+    if(!s){ warnBox.innerHTML=''; return; }
+    const est = estimateOutSize();
+    const thicknessCm = est.thicknessMm/10, weightKg = est.weightG/1000;
+    const overThick = s.thickness!=null && thicknessCm>s.thickness;
+    const overWeight = s.weight!=null && weightKg>s.weight;
+    if(overThick || overWeight){
+      warnBox.innerHTML = `<div style="background:#FFE1E1; border:1px solid var(--danger); color:var(--danger); border-radius:10px; padding:8px 12px; font-size:12px; font-weight:700; margin-bottom:10px;">⚠️「${escapeHtml(s.name)}」だとサイズオーバーの可能性があります（${[overThick?'厚み':null, overWeight?'重さ':null].filter(Boolean).join('・')}が上限超え）。上の「おすすめ」から選び直してください</div>`;
+    } else {
+      warnBox.innerHTML = '';
+    }
+  }
+  document.getElementById('exOutRows').addEventListener('input', refreshShipRecommendation);
+  document.getElementById('exOutRows').addEventListener('change', refreshShipRecommendation);
+  document.getElementById('exAddOutRow').addEventListener('click', ()=>setTimeout(refreshShipRecommendation, 0));
+  document.getElementById('exShip').addEventListener('change', validateShipSelection);
+  refreshShipRecommendation();
+
+  function buildDmText(){
+    const t = state.dmTemplates.find(x=>x.id===document.getElementById('exDmSelect').value);
+    if(!t) return '';
+    const ship = state.shippingMethods.find(s=>s.id===document.getElementById('exShip').value);
+    const pack = state.packingMethods.find(p=>p.id===document.getElementById('exPack').value);
+    let text = t.body;
+    text = text.replaceAll('［発送方法］', ship?ship.name:document.getElementById('exDelivery').value);
+    text = text.replaceAll('［梱包方法］', pack?pack.name:'［梱包方法］');
+    text = text.replaceAll('［金額］', document.getElementById('exShortfall').value ? yen(document.getElementById('exShortfall').value) : '［金額］');
+    return text;
+  }
+  function refreshDm(){
+    const text = buildDmText();
+    const box=document.getElementById('exCopyBox'); const btn=document.getElementById('exCopyBtn');
+    if(text){ box.style.display='block'; box.value=text; btn.style.display='block'; } else { box.style.display='none'; btn.style.display='none'; }
+  }
+  function refreshSettlementVisibility(){
+    document.getElementById('exSettlementFields').style.display = document.getElementById('exSettlementNeeded').checked ? 'block' : 'none';
+  }
+  document.getElementById('exSettlementNeeded').addEventListener('change', refreshSettlementVisibility);
+  function refreshPartnerHint(){
+    const userVal = document.getElementById('exPartnerUser').value.trim();
+    const accVal = document.getElementById('exPartnerAccount').value.trim();
+    const hint = document.getElementById('exPartnerHint');
+    if(!userVal && !accVal){ hint.style.display='none'; return; }
+    const candidate = state.exchangeRecords.find(r=>{
+      const un = r.partnerUserName||'', an = r.partnerAccountName||'';
+      const userHit = userVal && un && un!==userVal && (un.includes(userVal) || userVal.includes(un));
+      const accHit = accVal && an && an!==accVal && (an.includes(accVal) || accVal.includes(an));
+      return userHit || accHit;
+    });
+    if(candidate){
+      hint.style.display='block';
+      hint.innerHTML = `もしかして：<b>${escapeHtml(candidate.partnerUserName||'')}${candidate.partnerAccountName?'（'+escapeHtml(candidate.partnerAccountName)+'）':''}</b> ですか？ <button type="button" class="btn btn-ghost btn-sm" id="exPartnerHintUse" style="margin-left:6px;">これを使う</button>`;
+      const useBtn = document.getElementById('exPartnerHintUse');
+      if(useBtn) useBtn.onclick=()=>{
+        document.getElementById('exPartnerUser').value = candidate.partnerUserName||'';
+        document.getElementById('exPartnerAccount').value = candidate.partnerAccountName||'';
+        hint.style.display='none';
+      };
+    } else { hint.style.display='none'; }
+  }
+  document.getElementById('exPartnerUser').addEventListener('input', refreshPartnerHint);
+  document.getElementById('exPartnerAccount').addEventListener('input', refreshPartnerHint);
+  ['exDmSelect','exShip','exPack','exShortfall','exDelivery'].forEach(id=>document.getElementById(id).addEventListener('input', refreshDm));
+  const histSel = document.getElementById('exDmHistorySelect');
+  if(histSel) histSel.addEventListener('input', ()=>{
+    const h = state.dmHistory.find(x=>x.id===histSel.value);
+    if(h){ document.getElementById('exCopyBox').style.display='block'; document.getElementById('exCopyBox').value=h.text; document.getElementById('exCopyBtn').style.display='block'; }
+  });
+  document.querySelectorAll('#exDmQuickButtons [data-quickdm]').forEach(lb=>{
+    lb.onclick=()=>{
+      document.querySelectorAll('#exDmQuickButtons label').forEach(x=>x.style.background='var(--surface)');
+      lb.style.background='var(--surface2)';
+      document.getElementById('exDmSelect').value = lb.dataset.quickdm;
+      refreshDm();
+    };
+  });
+  document.getElementById('genFirstDmBtn').onclick=()=>{
+    const outIds = [...document.querySelectorAll('#exOutRows .exOutItem')].map(s=>s.value).filter(Boolean);
+    const outItems = outIds.map(id=>state.items.find(i=>i.id===id)).filter(Boolean);
+    const scheduledDate = document.getElementById('exScheduled').value;
+    const text = generateFirstDmText(outItems, scheduledDate);
+    const box=document.getElementById('exCopyBox'); const btn=document.getElementById('exCopyBtn');
+    box.style.display='block'; box.value=text; btn.style.display='block';
+    showToast('初回DM文面を生成しました。内容を確認・編集してからコピーしてね');
+  };
+  document.getElementById('exCopyBtn').onclick=async()=>{
+    const text = document.getElementById('exCopyBox').value;
+    navigator.clipboard.writeText(text); showToast('コピーしました');
+    await addDocTo('dmHistory', {text, createdAtStr:new Date().toISOString()});
+  };
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
+  document.getElementById('mSave').onclick=async()=>{
+    document.getElementById('mSave').textContent='保存中…';
+    const outItemsLinked = [...document.querySelectorAll('#exOutRows [data-outrow]')].map(row=>({
+      itemId: row.querySelector('.exOutItem').value, qty: Number(row.querySelector('.exOutQty').value)||1,
+    })).filter(o=>o.itemId);
+    const inRowEls = [...document.querySelectorAll('#exInRows [data-inrow]')];
+    const inItemsLinked = [];
+    for(const row of inRowEls){
+      const oshiName = row.querySelector('.exInOshi').value.trim();
+      if(!oshiName) continue;
+      const entry = {
+        oshiName, name: row.querySelector('.exInName').value.trim(),
+        qty: Number(row.querySelector('.exInQty').value)||1,
+        releaseId: row.querySelector('.exInRelease').value||null,
+        linkedItemId: row.querySelector('.exInLinked').value||null,
+        imageUrl: null,
+      };
+      const fileInput = row.querySelector('.exInImage');
+      if(fileInput.files[0]){
+        try{ entry.imageUrl = await uploadItemImage(fileInput.files[0], 'in_'+uidGen()); }catch(e){ /* 画像アップロード失敗時はスキップ */ }
+      }
+      inItemsLinked.push(entry);
+    }
+    const newStatus = document.getElementById('exStatus').value;
+    const data={
+      dealType:document.getElementById('exDealType').value,
+      partnerUserName:document.getElementById('exPartnerUser').value.trim(),
+      partnerAccountName:document.getElementById('exPartnerAccount').value.trim(),
+      date:document.getElementById('exDate').value,
+      outItemsLinked, inItemsLinked,
+      shortfallAmount:Number(document.getElementById('exShortfall').value)||0,
+      settlementNeeded:document.getElementById('exSettlementNeeded').checked,
+      paymentReceived:document.getElementById('exPaymentReceived').checked,
+      paymentDate:document.getElementById('exPaymentDate').value||null,
+      deliveryMethod:document.getElementById('exDelivery').value,
+      scheduledDate:document.getElementById('exScheduled').value||null,
+      sameDayWish:document.getElementById('exSameDay').checked,
+      shippingMethodId:document.getElementById('exShip').value||null,
+      packingMethodId:document.getElementById('exPack').value||null,
+      status:newStatus,
+      mySent:document.getElementById('exMySent').checked,
+      mySentDate:document.getElementById('exMySentDate').value||null,
+      myTracking:document.getElementById('exMyTracking').value,
+      theirSent:document.getElementById('exTheirSent').checked,
+      theirSentDate:document.getElementById('exTheirSentDate').value||null,
+      theirTracking:document.getElementById('exTheirTracking').value,
+    };
+    if(!isEdit || item.status!==newStatus) data.statusUpdatedAt = todayStr();
+    const willApplyStock = newStatus==='完了' && !item.stockApplied;
+    if(willApplyStock) data.stockApplied = true;
+    if(isEdit) await updateDocIn('exchangeRecords', item.id, data); else await addDocTo('exchangeRecords', data);
+    if(willApplyStock) await applyExchangeCompletion(data);
+    showToast('保存しました'); closeModal();
+  };
+}
+
+/* ================================================================
+   ⑥ 交換履歴一覧
+   ================================================================ */
+function renderHistoryTab(){
+  const done = state.exchangeRecords.filter(r=>r.status==='完了').sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const list = done.length ? done.map(r=>{
+    const outTxt = (r.outItemsLinked||[]).map(o=>{ const it=state.items.find(i=>i.id===o.itemId); return it?`${it.oshiName}${it.name?'『'+it.name+'』':''}×${o.qty}`:''; }).filter(Boolean).join('、') || '-';
+    const inTxt = (r.inItemsLinked||[]).map(i=>`${i.oshiName}${i.name?'『'+i.name+'』':''}×${i.qty}`).join('、') || '-';
+    return `<div class="list-item"><div><div class="meta">${escapeHtml(partnerLabel(r))}</div>
+      <div class="sub-meta">${escapeHtml(r.date||'')}　渡す：${escapeHtml(outTxt)}／もらう：${escapeHtml(inTxt)}</div></div></div>`;
+  }).join('') : `<div class="empty">完了した交換記録がありません</div>`;
+  return `<div class="card"><h2>交換履歴一覧 <span class="badge good">${done.length}件</span></h2>${list}
+    <button class="btn btn-ghost btn-block" id="exportHistoryCsvBtn" style="margin-top:10px;">📄 交換履歴をCSVで書き出す</button></div>`;
+}
+function bindHistoryEvents(){
+  const csvBtn=document.getElementById('exportHistoryCsvBtn');
+  if(csvBtn) csvBtn.onclick=()=>{
+    const done = state.exchangeRecords.filter(r=>r.status==='完了');
+    const rows = [['交換日','ユーザー名','アカウント名','渡したグッズ','もらったグッズ','精算金額']];
+    done.forEach(r=>{
+      const outTxt = (r.outItemsLinked||[]).map(o=>{ const it=state.items.find(i=>i.id===o.itemId); return it?`${it.oshiName}${it.name?'『'+it.name+'』':''}×${o.qty}`:''; }).filter(Boolean).join('、');
+      const inTxt = (r.inItemsLinked||[]).map(i=>`${i.oshiName}${i.name?'『'+i.name+'』':''}×${i.qty}`).join('、');
+      rows.push([r.date||'', r.partnerUserName||'', r.partnerAccountName||'', outTxt, inTxt, r.shortfallAmount||0]);
+    });
+    downloadCsv(`交換履歴_${todayStr()}.csv`, rows);
+  };
+}
+
+applyTheme();
+</script>
+</body>
+</html>
