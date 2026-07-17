@@ -500,9 +500,27 @@ async function saveTheme(themeKey){ state.theme=themeKey; applyTheme(); await se
 
 /* ---------------- 初期プリセット投入（1回のみ） ---------------- */
 let seededFlags = {ship:false, pack:false, platform:false};
+const SHIP_ORDER_KEYS = ["日本郵便||レターパックライト","日本郵便||レターパックプラス","日本郵便||定形郵便","日本郵便||定形外郵便(規格内)50g","日本郵便||定形外郵便(規格内)100g","日本郵便||定形外郵便(規格外)50g","日本郵便||定形外郵便(規格外)100g","日本郵便||スマートレター","日本郵便||クリックポスト","日本郵便||ゆうメール150g","日本郵便||ゆうメール250g","日本郵便||ゆうメール500g","日本郵便||ゆうメール1kg","日本郵便||ゆうパック(60サイズ)","ヤマト運輸||こねこ便420","ヤマト運輸||宅急便コンパクト","ヤマト運輸||宅急便(60サイズ)","メルカリ便(らくらく)||ネコポス","メルカリ便(らくらく)||宅急便コンパクト","メルカリ便(らくらく)||宅急便60サイズ","メルカリ便(らくらく)||宅急便100サイズ","メルカリ便(らくらく)||宅急便140サイズ〜","メルカリ便(ゆうゆう)||ゆうパケットポストmini","メルカリ便(ゆうゆう)||ゆうパケットポスト","メルカリ便(ゆうゆう)||ゆうパケット","メルカリ便(ゆうゆう)||ゆうパケットプラス","メルカリ便(ゆうゆう)||ゆうパック60サイズ","メルカリ便(ゆうゆう)||ゆうパック140サイズ〜","おてがる配送(ヤマト)||ネコポス","おてがる配送(ヤマト)||宅急便コンパクト(EAZY)","おてがる配送(ヤマト)||宅急便(EAZY)60サイズ","おてがる配送(ヤマト)||宅急便(EAZY)140サイズ〜","おてがる配送(日本郵便)||ゆうパケット","おてがる配送(日本郵便)||ゆうパケットポスト","おてがる配送(日本郵便)||ゆうパック60サイズ","おてがる配送(日本郵便)||ゆうパック140サイズ〜","かんたんラクマパック(日本郵便)||ゆうパケットポストmini","かんたんラクマパック(日本郵便)||ゆうパケットポスト","かんたんラクマパック(日本郵便)||ゆうパケット","かんたんラクマパック(日本郵便)||ゆうパケットプラス","かんたんラクマパック(日本郵便)||ゆうパック60サイズ","かんたんラクマパック(ヤマト運輸)||ネコポス","かんたんラクマパック(ヤマト運輸)||宅急便コンパクト","かんたんラクマパック(ヤマト運輸)||こねこ便420","かんたんラクマパック(ヤマト運輸)||宅急便60サイズ〜(2kg)"];
+let shipOrderMigrated = false;
+async function migrateShippingMethodOrder(){
+  if(shipOrderMigrated) return;
+  shipOrderMigrated = true;
+  const missing = state.shippingMethods.filter(s=>s.sortOrder==null);
+  if(!missing.length) return;
+  for(const s of missing){
+    const key = `${s.provider||''}||${s.name||''}`;
+    let idx = SHIP_ORDER_KEYS.indexOf(key);
+    if(idx<0) idx = 999;
+    await updateDocIn('shippingMethods', s.id, {sortOrder: idx});
+  }
+}
 async function maybeSeedShippingMethods(){
   if(seededFlags.ship) return;
-  if(state.shippingMethods.length>0){ seededFlags.ship=true; return; }
+  if(state.shippingMethods.length>0){
+    seededFlags.ship=true;
+    await migrateShippingMethodOrder();
+    return;
+  }
   seededFlags.ship = true;
   const defaults = [
     // provider, name, sanpen(cm), nagahen(cm), thickness(cm), weight(kg), price, note, visible, serviceGroup, platformGroup
@@ -556,8 +574,9 @@ async function maybeSeedShippingMethods(){
     ['かんたんラクマパック(ヤマト運輸)','こねこ便420',null,34,3,null,420,'専用封筒A4 34×24.8×3cm',false,null,'ラクマ'],
     ['かんたんラクマパック(ヤマト運輸)','宅急便60サイズ〜(2kg)',null,null,null,2,650,'A4より大きい商品向け・30kg以内',false,null,'ラクマ'],
   ];
-  for(const d of defaults){
-    await addDocTo('shippingMethods', {provider:d[0], name:d[1], sanpen:d[2], nagahen:d[3], thickness:d[4], weight:d[5], price:d[6], note:d[7], visible:d[8], serviceGroup:d[9]||null, platformGroup:d[10]||'個人'});
+  for(let i=0;i<defaults.length;i++){
+    const d = defaults[i];
+    await addDocTo('shippingMethods', {provider:d[0], name:d[1], sanpen:d[2], nagahen:d[3], thickness:d[4], weight:d[5], price:d[6], note:d[7], visible:d[8], serviceGroup:d[9]||null, platformGroup:d[10]||'個人', sortOrder:i});
   }
 }
 async function maybeSeedPackingMethods(){
@@ -744,8 +763,9 @@ function recommendShippingMethods(thicknessCm, weightKg){
 }
 function renderShipSection(){
   const PLATFORM_ORDER = ['個人','メルカリ','ヤフーフリマ','ラクマ'];
+  const sortedMethods = [...state.shippingMethods].sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
   const platforms = {};
-  state.shippingMethods.forEach(s=>{ const pg=s.platformGroup||'個人'; (platforms[pg]=platforms[pg]||[]).push(s); });
+  sortedMethods.forEach(s=>{ const pg=s.platformGroup||'個人'; (platforms[pg]=platforms[pg]||[]).push(s); });
   const body = PLATFORM_ORDER.filter(pg=>platforms[pg]).map(pg=>{
     const groups = {};
     platforms[pg].forEach(s=>{ (groups[s.provider||'その他']=groups[s.provider||'その他']||[]).push(s); });
@@ -1364,7 +1384,7 @@ function openMarkSoldModal(item){
   const host=document.getElementById('modalHost');
   const release = state.releases.find(r=>r.id===item.releaseId);
   const effectiveCost = item.costPrice!=null ? item.costPrice : (release?release.definedPrice:0);
-  const marketplaceShip = state.shippingMethods.filter(s=>s.visible && ['メルカリ','ヤフーフリマ','ラクマ'].includes(s.platformGroup));
+  const marketplaceShip = [...state.shippingMethods].sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)).filter(s=>s.visible && ['メルカリ','ヤフーフリマ','ラクマ'].includes(s.platformGroup));
   host.innerHTML=`<div class="modal-overlay" id="ov"><div class="modal"><h3>売却情報を入力</h3>
     <div class="field-group"><label class="field">出品先</label><select id="msPlatform"><option value="">選択なし</option>${state.platforms.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}（手数料${p.feeRate}%）</option>`).join('')}</select></div>
     <div class="field-group"><label class="field">発送方法</label><select id="msShipMethod"><option value="">未定</option>${marketplaceShip.map(s=>`<option value="${s.id}">${escapeHtml(s.platformGroup)} / ${escapeHtml(s.name)}（${s.price>=0?yen(s.price):'料金別途'}）</option>`).join('')}</select></div>
@@ -1471,7 +1491,7 @@ function formatDateJp(dateStr){
 function generateFirstDmText(outItems, scheduledDate){
   const releaseNames = [...new Set(outItems.map(i=>{ const r=state.releases.find(x=>x.id===i.releaseId); return r?r.name:null; }).filter(Boolean))];
   const dealSection = (releaseNames.length? releaseNames.join('、')+'\n' : '') + outItems.map(i=>`・${i.oshiName}${i.name?'『'+i.name+'』':''}`).join('\n');
-  const visibleShip = state.shippingMethods.filter(s=>s.visible && (s.platformGroup||'個人')==='個人');
+  const visibleShip = [...state.shippingMethods].sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)).filter(s=>s.visible && (s.platformGroup||'個人')==='個人');
   const shipSection = visibleShip.length ? visibleShip.map(s=>`・${s.name}`).join('\n') : '・（マスタで発送方法を表示ONにしてください）';
   const packSection = outItems.map(i=>{
     const release = state.releases.find(r=>r.id===i.releaseId);
@@ -1630,7 +1650,7 @@ async function applyExchangeCompletion(record){
 }
 function openExchangeModal(item){
   const isEdit=!!item.id; const host=document.getElementById('modalHost');
-  const visibleShip = state.shippingMethods.filter(s=>s.visible && (s.platformGroup||'個人')==='個人');
+  const visibleShip = [...state.shippingMethods].sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)).filter(s=>s.visible && (s.platformGroup||'個人')==='個人');
   let outRows = (item.outItemsLinked||[{itemId:'',qty:1}]).map(o=>({...o}));
   let inRows = (item.inItemsLinked||[{oshiName:'',name:'',qty:1,linkedItemId:'',releaseId:''}]).map(i=>({...i}));
 
