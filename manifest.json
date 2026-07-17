@@ -1,0 +1,9 @@
+{
+  "name": "グッズ交換在庫管理",
+  "short_name": "交換管理",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FFF7FB",
+  "theme_color": "#FF6FA5",
+  "icons": []
+}
