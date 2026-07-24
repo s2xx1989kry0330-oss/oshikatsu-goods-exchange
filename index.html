@@ -2029,60 +2029,68 @@ function openExchangeModal(item){
   document.getElementById('mCancel').onclick=closeModal;
   document.getElementById('ov').onclick=(e)=>{ if(e.target.id==='ov') closeModal(); };
   document.getElementById('mSave').onclick=async()=>{
-    document.getElementById('mSave').textContent='保存中…';
-    const outItemsLinked = [...document.querySelectorAll('#exOutRows [data-outrow]')].map(row=>({
-      itemId: row.querySelector('.exOutItem').value, qty: Number(row.querySelector('.exOutQty').value)||1,
-    })).filter(o=>o.itemId);
-    const inRowEls = [...document.querySelectorAll('#exInRows [data-inrow]')];
-    const inItemsLinked = [];
-    for(const row of inRowEls){
-      const oshiName = row.querySelector('.exInOshi').value.trim();
-      if(!oshiName) continue;
-      const releaseNameInput = row.querySelector('.exInReleaseName');
-      const releaseId = releaseNameInput ? await findOrCreateRelease(releaseNameInput.value) : null;
-      const entry = {
-        oshiName, name: row.querySelector('.exInName').value.trim(),
-        qty: Number(row.querySelector('.exInQty').value)||1,
-        releaseId,
-        linkedItemId: row.querySelector('.exInLinked').value||null,
-        imageUrl: null,
-      };
-      const fileInput = row.querySelector('.exInImage');
-      if(fileInput.files[0]){
-        try{ entry.imageUrl = await uploadItemImage(fileInput.files[0], 'in_'+uidGen()); }catch(e){ /* 画像アップロード失敗時はスキップ */ }
+    const saveBtn = document.getElementById('mSave');
+    const originalBtnText = saveBtn.textContent;
+    saveBtn.textContent='保存中…'; saveBtn.disabled = true;
+    try{
+      const outItemsLinked = [...document.querySelectorAll('#exOutRows [data-outrow]')].map(row=>({
+        itemId: row.querySelector('.exOutItem').value, qty: Number(row.querySelector('.exOutQty').value)||1,
+      })).filter(o=>o.itemId);
+      const inRowEls = [...document.querySelectorAll('#exInRows [data-inrow]')];
+      const inItemsLinked = [];
+      for(const row of inRowEls){
+        const oshiName = row.querySelector('.exInOshi').value.trim();
+        if(!oshiName) continue;
+        const releaseNameInput = row.querySelector('.exInReleaseName');
+        const releaseId = releaseNameInput ? await findOrCreateRelease(releaseNameInput.value) : null;
+        const entry = {
+          oshiName, name: row.querySelector('.exInName').value.trim(),
+          qty: Number(row.querySelector('.exInQty').value)||1,
+          releaseId,
+          linkedItemId: row.querySelector('.exInLinked').value||null,
+          imageUrl: null,
+        };
+        const fileInput = row.querySelector('.exInImage');
+        if(fileInput.files[0]){
+          try{ entry.imageUrl = await uploadItemImage(fileInput.files[0], 'in_'+uidGen()); }catch(e){ /* 画像アップロード失敗時はスキップ */ }
+        }
+        inItemsLinked.push(entry);
       }
-      inItemsLinked.push(entry);
+      const newStatus = document.getElementById('exStatus').value;
+      const data={
+        dealType:document.getElementById('exDealType').value,
+        partnerUserName:document.getElementById('exPartnerUser').value.trim(),
+        partnerAccountName:document.getElementById('exPartnerAccount').value.trim(),
+        date:document.getElementById('exDate').value,
+        outItemsLinked, inItemsLinked,
+        shortfallAmount:Number(document.getElementById('exShortfall').value)||0,
+        settlementNeeded:document.getElementById('exSettlementNeeded').checked,
+        paymentReceived:document.getElementById('exPaymentReceived').checked,
+        paymentDate:document.getElementById('exPaymentDate').value||null,
+        deliveryMethod:document.getElementById('exDelivery').value,
+        scheduledDate:document.getElementById('exScheduled').value||null,
+        sameDayWish:document.getElementById('exSameDay').checked,
+        shippingMethodId:document.getElementById('exShip').value||null,
+        packingMethodId:document.getElementById('exPack').value||null,
+        status:newStatus,
+        mySent:document.getElementById('exMySent').checked,
+        mySentDate:document.getElementById('exMySentDate').value||null,
+        myTracking:document.getElementById('exMyTracking').value,
+        theirSent:document.getElementById('exTheirSent').checked,
+        theirSentDate:document.getElementById('exTheirSentDate').value||null,
+        theirTracking:document.getElementById('exTheirTracking').value,
+      };
+      if(!isEdit || item.status!==newStatus) data.statusUpdatedAt = todayStr();
+      const willApplyStock = newStatus==='完了' && !item.stockApplied;
+      if(willApplyStock) data.stockApplied = true;
+      if(isEdit) await updateDocIn('exchangeRecords', item.id, data); else await addDocTo('exchangeRecords', data);
+      if(willApplyStock) await applyExchangeCompletion(data);
+      showToast('保存しました'); closeModal();
+    }catch(err){
+      console.error('交換記録の保存でエラー', err);
+      alert('保存中にエラーが発生しました：\n' + (err && err.message ? err.message : err));
+      saveBtn.textContent = originalBtnText; saveBtn.disabled = false;
     }
-    const newStatus = document.getElementById('exStatus').value;
-    const data={
-      dealType:document.getElementById('exDealType').value,
-      partnerUserName:document.getElementById('exPartnerUser').value.trim(),
-      partnerAccountName:document.getElementById('exPartnerAccount').value.trim(),
-      date:document.getElementById('exDate').value,
-      outItemsLinked, inItemsLinked,
-      shortfallAmount:Number(document.getElementById('exShortfall').value)||0,
-      settlementNeeded:document.getElementById('exSettlementNeeded').checked,
-      paymentReceived:document.getElementById('exPaymentReceived').checked,
-      paymentDate:document.getElementById('exPaymentDate').value||null,
-      deliveryMethod:document.getElementById('exDelivery').value,
-      scheduledDate:document.getElementById('exScheduled').value||null,
-      sameDayWish:document.getElementById('exSameDay').checked,
-      shippingMethodId:document.getElementById('exShip').value||null,
-      packingMethodId:document.getElementById('exPack').value||null,
-      status:newStatus,
-      mySent:document.getElementById('exMySent').checked,
-      mySentDate:document.getElementById('exMySentDate').value||null,
-      myTracking:document.getElementById('exMyTracking').value,
-      theirSent:document.getElementById('exTheirSent').checked,
-      theirSentDate:document.getElementById('exTheirSentDate').value||null,
-      theirTracking:document.getElementById('exTheirTracking').value,
-    };
-    if(!isEdit || item.status!==newStatus) data.statusUpdatedAt = todayStr();
-    const willApplyStock = newStatus==='完了' && !item.stockApplied;
-    if(willApplyStock) data.stockApplied = true;
-    if(isEdit) await updateDocIn('exchangeRecords', item.id, data); else await addDocTo('exchangeRecords', data);
-    if(willApplyStock) await applyExchangeCompletion(data);
-    showToast('保存しました'); closeModal();
   };
 }
 
